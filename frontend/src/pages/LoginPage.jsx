@@ -9,6 +9,14 @@ const LoginPage = () => {
   const [bio, setBio] = useState("")
   const [isDataSubmitted, setIsDataSubmitted] = useState(false)
 
+  const onSubmitHandler =  (event) => {
+    event.preventDefault()
+
+    if(currState === 'Sign up' && !isDataSubmitted){
+      setIsDataSubmitted(true)
+      return
+    }
+  }
 
   return (
     <div className='min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl'>
@@ -17,9 +25,9 @@ const LoginPage = () => {
       <img src={assets.logo_big} className='w-[min(30vw, 250px)]' alt="" />
 
       {/* right */}
-      <form action="" className='border-2 bg-white/8 text-white border-gray-500 p-6 flex flex-col gap-6 rounded-lg shadow-lg'>
+      <form onSubmit={onSubmitHandler} action="" className='border-2 bg-white/8 text-white border-gray-500 p-6 flex flex-col gap-6 rounded-lg shadow-lg'>
         <h2>{currState}
-          <img src={assets.arrow_icon} alt="" />
+          {isDataSubmitted && <img onClick={() => setIsDataSubmitted(false)} src={assets.arrow_icon} alt="" /> }
         </h2>
 
         {currState === "Sign up" && !isDataSubmitted && (
@@ -44,6 +52,14 @@ const LoginPage = () => {
         <div>
           <input type="checkbox" name="" id="" />
           <p>Agree to terms and privacy policy</p>
+        </div>
+
+        <div>
+          {currState === "Sign up" ? (
+            <p>Already have an account? <span onClick={() => {setCurrState("Login"); setIsDataSubmitted(false)}}>Login here</span></p>
+          ) : (
+            <p>Create an account <span onClick={() => setCurrState("Sign up")}>here</span></p>
+          )}
         </div>
       </form>
 
