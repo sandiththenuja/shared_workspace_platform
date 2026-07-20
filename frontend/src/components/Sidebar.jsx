@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import assets, { userDummyData } from '../assets/assets'
 import {useNavigate} from 'react-router-dom'
+import { AuthContext } from '../context/AuthContext'
 
 const Sidebar = ({selectedUser, setSelectedUser}) => {
+    const {logout} = useContext(AuthContext)
     const navigate = useNavigate()
 
   return (
@@ -13,7 +15,7 @@ const Sidebar = ({selectedUser, setSelectedUser}) => {
                 <img src={assets.menu_icon} alt="" />
                 <div>
                     <p onClick={() => navigate('/profile')}>Edit profile</p>
-                    <p>Logout</p>
+                    <p onClick={() => logout()} className='cursor-pointer'>Logout</p>
                 </div>
             </div>
 
