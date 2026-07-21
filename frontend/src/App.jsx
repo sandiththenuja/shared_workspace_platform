@@ -11,7 +11,7 @@ function App() {
 
   return (
     <>
-    <div>
+    <div className='bg-gray-700'>
       <Toaster />
       <Routes>
         <Route path='/' element={authUser ? <HomePage /> : <Navigate to="/login" />} />

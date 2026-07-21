@@ -1,7 +1,7 @@
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 
 export const generateToken = (userId) => {
-    const token = jwt.sign({userId}, process.env.JWT_SECRET)
-    return token
-}
-
+    // ✅ Use 'id' field to match auth middleware
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    return token;
+};

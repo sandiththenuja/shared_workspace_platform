@@ -1,53 +1,52 @@
-import express from 'express'
-import 'dotenv/config'
-import cors from 'cors'
-import http from 'http'
-import connectDB from './lib/db.js'
-import userRouter from './routes/userRoutes.js'
-import messageRouter from './routes/messageRoutes.js'
-import { Server } from 'socket.io'
+import express from 'express';
+import 'dotenv/config';
+import cors from 'cors';
+import http from 'http';
+import connectDB from './lib/db.js';
+import userRouter from './routes/userRoutes.js';
+import messageRouter from './routes/messageRoutes.js';
+import { Server } from 'socket.io';
 
-const app = express()
-const server = http.createServer(app)
+const app = express();
+const server = http.createServer(app);
 
-// initialize socket.io server
 export const io = new Server(server, {
-    cors: {origin: "*"}
-})
+    cors: { origin: "*" }
+});
 
-// store online users
-export const userSocketMap = {}    // {userId: socketId}
+export const userSocketMap = {};
 
 io.on("connection", (socket) => {
-    const userId = socket.handshake.query.userId
+    const userId = socket.handshake.query.userId;
     console.log("user connected", userId);
     
-    if(userId) userSocketMap[userId] = socket.id
+    if(userId) userSocketMap[userId] = socket.id;
 
-    // emit online users to all connected clients
-    io.emit("getOnlineUsers", Object.keys(userSocketMap))
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
     socket.on("disconnect", () => {
-        console.log("user disconnected", usreId);
-        delete userSocketMap[userId]
-        io.emit("getOnlineUsers", Object.keys(userSocketMap))
-    })
-})
+        console.log("user disconnected", userId);
+        delete userSocketMap[userId];
+        io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    });
+});
 
-app.use(express.json({limit: "4mb"}))
-app.use(cors())
+app.use(express.json({ limit: "4mb" }));
+app.use(cors());
 
-app.use("/", (req, res) => res.send("Server is live"))
-app.use("/auth", userRouter)
-app.use("messages", messageRouter)
+// ✅ Move this AFTER all route definitions
+// app.use("/", (req, res) => res.send("Server is live"));
 
-await connectDB()
+// ✅ Define specific routes BEFORE catch-all
+app.use("/auth", userRouter);
+app.use("/messages", messageRouter);
 
-const PORT = process.env.PORT || 8000
-server.listen(PORT, () => console.log(`Server on PORT: ${PORT}`))
+// ✅ Root route should be last
+app.use("/", (req, res) => res.send("Server is live"));
 
-
-
-
-
-
+const startServer = async () => {
+    await connectDB();
+    const PORT = process.env.PORT || 8000;
+    server.listen(PORT, () => console.log(`Server on PORT: ${PORT}`));
+};
+startServer();
