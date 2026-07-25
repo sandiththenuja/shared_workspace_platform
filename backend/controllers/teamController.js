@@ -485,7 +485,6 @@ export const getTeamById = async (req, res) => {
     }
 };
 
-// ===== LEAVE TEAM =====
 export const leaveTeam = async (req, res) => {
     try {
         const { id } = req.params;
@@ -550,49 +549,6 @@ export const leaveTeam = async (req, res) => {
     }
 };
 
-// ===== GENERATE NEW INVITE CODE =====
-export const generateInviteCode = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const userId = req.user._id;
-
-        const team = await Team.findById(id);
-        if (!team) {
-            return res.status(404).json({
-                success: false,
-                message: 'Team not found'
-            });
-        }
-
-        // Check if user is admin/creator
-        if (!isTeamAdmin(team, userId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the team creator can generate invite codes'
-            });
-        }
-
-        // Generate new invite code
-        const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-        team.inviteCode = newInviteCode;
-        await team.save();
-
-        res.json({
-            success: true,
-            inviteCode: newInviteCode,
-            message: 'New invite code generated successfully'
-        });
-
-    } catch (error) {
-        console.error('Generate invite code error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to generate invite code'
-        });
-    }
-};
-
-// ===== JOIN TEAM BY INVITE CODE =====
 export const joinTeamByInvite = async (req, res) => {
     try {
         const { inviteCode } = req.params;
@@ -623,8 +579,8 @@ export const joinTeamByInvite = async (req, res) => {
 
         // Populate team
         const populatedTeam = await Team.findById(team._id)
-            .populate('members', 'fullName email profilePic status')
-            .populate('createdBy', 'fullName email profilePic');
+            .populate('members', 'name email profilePic')
+            .populate('createdBy', 'name email profilePic');
 
         // Notify all members
         team.members.forEach(memberId => {

@@ -8,6 +8,7 @@ import messageRouter from './routes/messageRoutes.js';
 import { Server } from 'socket.io';
 import taskRouter from './routes/taskRoutes.js';
 import teamRouter from './routes/teamRoutes.js';
+import reportRouter from './routes/reportRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -36,16 +37,12 @@ io.on("connection", (socket) => {
 app.use(express.json({ limit: "4mb" }));
 app.use(cors());
 
-// ✅ Move this AFTER all route definitions
-// app.use("/", (req, res) => res.send("Server is live"));
-
-// ✅ Define specific routes BEFORE catch-all
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/teams", teamRouter);
+app.use("/api/reports", reportRouter);
 
-// ✅ Root route should be last
 app.use("/", (req, res) => res.send("Server is live"));
 
 const startServer = async () => {

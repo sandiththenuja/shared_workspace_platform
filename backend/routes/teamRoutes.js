@@ -1,5 +1,5 @@
 import express from 'express'
-import { addTeamMember, createTeam, deleteTeam, getTeamById, getUserTeams, removeTeamMember, updateTeam } from '../controllers/teamController.js'
+import { addTeamMember, createTeam, deleteTeam, getTeamById, getUserTeams, joinTeamByInvite, leaveTeam, removeTeamMember, updateTeam } from '../controllers/teamController.js'
 import { protectRoute } from '../middleware/auth.js'
 
 const teamRouter = express.Router()
@@ -16,7 +16,8 @@ teamRouter.delete("/:id/:memberId", protectRoute, removeTeamMember)
 teamRouter.delete("/:id/", protectRoute, deleteTeam)
 teamRouter.get("/", protectRoute, getUserTeams)
 teamRouter.get("/:id", protectRoute, getTeamById)
-// teamRouter.put("/:id/status", protectRoute, updateTaskStatus)
+teamRouter.put("/:id/member/update", protectRoute, leaveTeam)
+teamRouter.put("/:inviteCode/member/invite", protectRoute, joinTeamByInvite)
 // teamRouter.put("/:id/todo", protectRoute, updateTaskCheckList)
 
 
