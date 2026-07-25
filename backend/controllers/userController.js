@@ -4,10 +4,10 @@ import bcrypt from 'bcryptjs';
 import cloudinary from '../lib/cloudinary.js';
 
 export const signup = async(req, res) => {
-    const {fullName, email, password, bio} = req.body;
+    const {name, email, password, bio} = req.body;
 
     try {
-        if(!fullName || !email || !password || !bio){
+        if(!name || !email || !password || !bio){
             return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
@@ -21,19 +21,17 @@ export const signup = async(req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = await User.create({
-            fullName, 
+            name, 
             email, 
             password: hashedPassword, 
             bio
         });
 
-        // ✅ Generate token with user id
         const token = generateToken(newUser._id);
 
-        // ✅ Send back user data (excluding password)
         const userData = {
             _id: newUser._id,
-            fullName: newUser.fullName,
+            name: newUser.name,
             email: newUser.email,
             bio: newUser.bio,
             profilePic: newUser.profilePic || ""
@@ -70,7 +68,7 @@ export const login = async(req, res) => {
 
         const userResponse = {
             _id: userData._id,
-            fullName: userData.fullName,
+            name: userData.name,
             email: userData.email,
             bio: userData.bio,
             profilePic: userData.profilePic || ""
@@ -97,15 +95,15 @@ export const checkAuth = (req, res) => {
 
 export const updateProfile = async(req, res) => {
     try {
-        const {profilePic, bio, fullName} = req.body;
+        const {profilePic, bio, name} = req.body;
         const userId = req.user._id;
         let updateUser;
 
         if(!profilePic){
-            updateUser = await User.findByIdAndUpdate(userId, {bio, fullName}, {new: true});
+            updateUser = await User.findByIdAndUpdate(userId, {bio, name}, {new: true});
         }else{
             const upload = await cloudinary.uploader.upload(profilePic);
-            updateUser = await User.findByIdAndUpdate(userId, {profilePic: upload.secure_url, bio, fullName}, {new: true});
+            updateUser = await User.findByIdAndUpdate(userId, {profilePic: upload.secure_url, bio, name}, {new: true});
         }
         res.status(200).json({ success: true, user: updateUser });
     } catch (error) {

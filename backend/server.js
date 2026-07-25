@@ -6,6 +6,8 @@ import connectDB from './lib/db.js';
 import userRouter from './routes/userRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import { Server } from 'socket.io';
+import taskRouter from './routes/taskRoutes.js';
+import teamRouter from './routes/teamRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -38,15 +40,17 @@ app.use(cors());
 // app.use("/", (req, res) => res.send("Server is live"));
 
 // ✅ Define specific routes BEFORE catch-all
-app.use("/auth", userRouter);
-app.use("/messages", messageRouter);
+app.use("/api/auth", userRouter);
+app.use("/api/messages", messageRouter);
+app.use("/api/tasks", taskRouter);
+app.use("/api/teams", teamRouter);
 
 // ✅ Root route should be last
 app.use("/", (req, res) => res.send("Server is live"));
 
 const startServer = async () => {
     await connectDB();
-    const PORT = process.env.PORT || 8000;
-    server.listen(PORT, () => console.log(`Server on PORT: ${PORT}`));
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => console.log(`Server on PORT: http://localhost:${PORT}`));
 };
 startServer();
