@@ -1,6 +1,8 @@
 import Team from "../models/Team.js";
 import User from "../models/User.js";
 import { io, userSocketMap } from "../server.js";
+import mongoose from "mongoose";
+import cloudinary from '../lib/cloudinary.js';
 
 const isTeamAdmin = (team, userId) => {
     return team.createdBy.toString() === userId.toString();
@@ -49,7 +51,7 @@ export const createTeam = async (req, res) => {
             .populate('createdBy', 'name email profilePic')
             .populate('members.invitedBy', 'name email');
 
-        const socketId = userSocketMap[createdBy];
+        const socketId = userSocketMap[userId];
         if (socketId) {
             io.to(socketId).emit('teamCreated', {
                 team: populatedTeam,
@@ -77,7 +79,7 @@ export const updateTeam = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user._id;
-        const updates = req.body;
+        const {name, description, isPrivate, coverImage} = req.body;
 
         const team = await Team.findById(id);
         if (!team) {
@@ -94,27 +96,42 @@ export const updateTeam = async (req, res) => {
             });
         }
 
-        const allowedUpdates = ['name', 'description', 'coverImage', 'inviteCode', 'isPrivate'];
-        const updateData = {};
+        let updateData = {
+            name: name || team.name,
+            description: description !== undefined ? description : team.description,
+            isPrivate: isPrivate !== undefined ? isPrivate : team.isPrivate
+        };
 
-        Object.keys(updates).forEach(key => {
-            if (allowedUpdates.includes(key)) {
-                updateData[key] = updates[key];
+        if (coverImage) {
+            // Check if it's a base64 image
+            if (coverImage.startsWith('data:image')) {
+                // Upload to Cloudinary
+                const uploadResponse = await cloudinary.uploader.upload(coverImage, {
+                    folder: 'team_cover_images',
+                    transformation: [
+                        { width: 1200, height: 400, crop: 'fill' },
+                        { quality: 'auto' },
+                        { fetch_format: 'auto' }
+                    ]
+                });
+                updateData.coverImage = uploadResponse.secure_url;
+            } else {
+                // If it's already a URL, use it directly
+                updateData.coverImage = coverImage;
             }
-        });
+        }
 
-        const updatedTeam = await Team.findByIdAndUpdate(
+         const updatedTeam = await Team.findByIdAndUpdate(
             id,
             updateData,
             { new: true, runValidators: true }
         )
-        .populate('members.user', 'name email profilePic status')
-        .populate('createdBy', 'name email profilePic')
-        .populate('members.invitedBy', 'name email');
+        .populate('members', 'fullName email profilePic status')
+        .populate('createdBy', 'fullName email profilePic');
 
         // Notify all team members
-        team.members.forEach(member => {
-            const socketId = userSocketMap[member.user];
+        team.members.forEach(memberId => {
+            const socketId = userSocketMap[memberId.toString()];
             if (socketId) {
                 io.to(socketId).emit('teamUpdated', {
                     teamId: id,
@@ -442,14 +459,23 @@ export const getUserTeams = async (req, res) => {
     }
 };
 
+// controllers/teamController.js
 export const getTeamById = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user._id;
 
+        // Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid team ID format'
+            });
+        }
+
         const team = await Team.findById(id)
-            .populate('members', 'name email profilePic')
-            .populate('createdBy', 'name email profilePic');
+            .populate('members', 'fullName email profilePic status')
+            .populate('createdBy', 'fullName email profilePic');
 
         if (!team) {
             return res.status(404).json({
@@ -458,18 +484,28 @@ export const getTeamById = async (req, res) => {
             });
         }
 
-        // Check if user is a member or creator
-        const isMember = isTeamMember(team, userId) || isTeamAdmin(team, userId);
-        if (!isMember) {
+        // FIXED: Check if user is the creator OR a member
+        const isCreator = team.createdBy && team.createdBy._id.toString() === userId.toString();
+        
+        // Check if user is in members array
+        const isMember = team.members && team.members.some(member => {
+            const memberId = member._id || member;
+            return memberId.toString() === userId.toString();
+        });
+
+        // Allow access if user is creator OR member
+        if (!isCreator && !isMember) {
             return res.status(403).json({
                 success: false,
                 message: 'You are not a member of this team'
             });
         }
 
-        // Add admin status to response
+        // Convert to object and add computed fields
         const teamObj = team.toObject();
-        teamObj.isAdmin = isTeamAdmin(team, userId);
+        teamObj.isAdmin = isCreator;
+        teamObj.isMember = isMember || isCreator;
+        teamObj.memberCount = team.members ? team.members.length : 0;
 
         res.json({
             success: true,

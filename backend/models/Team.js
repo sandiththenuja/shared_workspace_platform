@@ -6,7 +6,7 @@ const teamSchema = new mongoose.Schema({
     coverImg: {type: String, default: ""},
     createdBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     members: [{type: mongoose.Schema.Types.ObjectId, ref: "User"}],
-    inviteCode: {type: String, unique: true, default: null},
+    inviteCode: {type: String, unique: true, default: "code123"},
     isPrivate: {type: Boolean, default: false}
 }, {timestamps: true})
 

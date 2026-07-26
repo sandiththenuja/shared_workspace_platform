@@ -1,11 +1,11 @@
-const Task = require('../models/Task')
-const User = require('../models/User')
-const excelJS = require('exceljs')
+import Task from "../models/Task.js"
+import User from "../models/User.js"
+import excelJS from 'exceljs'
 
 // @desc - export all tasks as excel file
 // @route - GET/api/reports/exports/tasks
 // @access - Private (admin)
-const exportTaskReport = async(req, res) => {
+export const exportTaskReport = async(req, res) => {
     try {
         const tasks = await Task.find().populate("assignedTo", "name email")
         const workbook = new excelJS.Workbook()
@@ -54,7 +54,7 @@ const exportTaskReport = async(req, res) => {
 // @desc - export user task as excel file
 // @route - GET/api/reports/exports/users
 // @access - Private (admin)
-const exportUserReport = async(req, res) => {
+export const exportUserReport = async(req, res) => {
     try {
         const users = await User.find().select("name email _id").lean()
         const userTasks = await Task.find().populate("assignedTo", "name email _id")
@@ -121,5 +121,3 @@ const exportUserReport = async(req, res) => {
         res.status(500).json({message: "Error exporting users", error: error.message})
     }
 }
-
-module.exports = {exportTaskReport, exportUserReport}
