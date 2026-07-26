@@ -7,7 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 
 const LoginPage = () => {
     const [isLogin, setIsLogin] = useState(true);
-    const [fullName, setFullName] = useState("");
+    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [bio, setBio] = useState("");
@@ -20,7 +20,7 @@ const LoginPage = () => {
         if (isLogin) {
             login('login', { email, password });
         } else {
-            login('signup', { fullName, email, password, bio });
+            login('signup', { name, email, password, bio });
         }
     };
 
@@ -112,8 +112,8 @@ const LoginPage = () => {
                                 <input
                                     type="text"
                                     placeholder="Full Name"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
                                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white/50 text-sm placeholder:text-slate-400"
                                     required={!isLogin}
                                 />
