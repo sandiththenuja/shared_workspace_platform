@@ -9,6 +9,8 @@ import { Server } from 'socket.io';
 import taskRouter from './routes/taskRoutes.js';
 import teamRouter from './routes/teamRoutes.js';
 import reportRouter from './routes/reportRoutes.js';
+import cloudinaryRouter from './routes/cloudinaryRoutes.js';
+import canvasRouter from './routes/canvasRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -42,6 +44,8 @@ app.use("/api/messages", messageRouter);
 app.use("/api/tasks", taskRouter);
 app.use("/api/teams", teamRouter);
 app.use("/api/reports", reportRouter);
+app.use("/api/cloudinary", cloudinaryRouter);
+app.use("/api/canvases", canvasRouter);
 
 app.use("/", (req, res) => res.send("Server is live"));
 

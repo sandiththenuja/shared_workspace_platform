@@ -75,38 +75,275 @@ export const createTeam = async (req, res) => {
     }
 }
 
+// export const updateTeam = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const userId = req.user._id;
+//         const {name, description, isPrivate, coverImg, files, fileNames, fileDescriptions } = req.body;
+
+//         const team = await Team.findById(id);
+//         if (!team) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: 'Team not found'
+//             });
+//         }
+
+//         if (!isTeamAdmin(team, userId)) {
+//             return res.status(403).json({
+//                 success: false,
+//                 message: 'Only the team creator can update team details'
+//             });
+//         }
+
+//         let updateData = {
+//             name: name || team.name,
+//             description: description !== undefined ? description : team.description,
+//             isPrivate: isPrivate !== undefined ? isPrivate : team.isPrivate
+//         };
+
+//         if (coverImg) {
+//             // Check if it's a base64 image
+//             if (coverImg.startsWith('data:image')) {
+//                 // Upload to Cloudinary
+//                 const uploadResponse = await cloudinary.uploader.upload(coverImg, {
+//                     folder: 'team_cover_images',
+//                     transformation: [
+//                         { width: 1200, height: 400, crop: 'fill' },
+//                         { quality: 'auto' },
+//                         { fetch_format: 'auto' }
+//                     ]
+//                 });
+//                 updateData.coverImg = uploadResponse.secure_url;
+//             } else {
+//                 // If it's already a URL, use it directly
+//                 updateData.coverImg = coverImg;
+//             }
+//         }
+// // 2. Handle multiple files (base64 array)
+//         if (files && Array.isArray(files) && files.length > 0) {
+//             // Initialize files array if it doesn't exist
+//             if (!team.files) {
+//                 team.files = [];
+//             }
+
+//             // Process each file
+//             for (let i = 0; i < files.length; i++) {
+//                 const fileData = files[i];
+//                 const fileName = fileNames && fileNames[i] ? fileNames[i] : `File ${i + 1}`;
+//                 const fileDescription = fileDescriptions && fileDescriptions[i] ? fileDescriptions[i] : '';
+
+//                 // Skip if file data is not valid
+//                 if (!fileData || !fileData.startsWith('data:')) {
+//                     console.log(`Skipping invalid file data at index ${i}`);
+//                     continue;
+//                 }
+
+//                 try {
+//                     // Extract mime type from base64
+//                     const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,/);
+//                     const mimeType = matches ? matches[1] : 'application/octet-stream';
+                    
+//                     // Determine resource type for Cloudinary
+//                     let resourceType = 'auto';
+//                     if (mimeType.startsWith('image/')) {
+//                         resourceType = 'image';
+//                     } else if (mimeType.startsWith('video/')) {
+//                         resourceType = 'video';
+//                     } else {
+//                         resourceType = 'raw';
+//                     }
+
+//                     // Upload to Cloudinary
+//                     const uploadOptions = {
+//                         folder: `team_files/${id}`,
+//                         resource_type: resourceType,
+//                         public_id: `${Date.now()}-${fileName.split('.')[0].replace(/\s/g, '_')}`,
+//                         use_filename: true,
+//                         unique_filename: true,
+//                     };
+
+//                     // Handle PDF specifically
+//                     if (mimeType === 'application/pdf') {
+//                         uploadOptions.format = 'pdf';
+//                         uploadOptions.resource_type = 'raw';
+//                     }
+
+//                     const result = await cloudinary.uploader.upload(fileData, uploadOptions);
+
+//                     // Create file object matching the schema
+//                     const fileObject = {
+//                         name: fileName,
+//                         url: result.secure_url,
+//                         fileSize: result.bytes || 0,
+//                         fileType: mimeType,
+//                         publicId: result.public_id,
+//                         uploadedBy: userId,
+//                         uploadedAt: new Date(),
+//                         description: fileDescription
+//                     };
+
+//                     // Check if file already exists (prevent duplicates)
+//                     const existingFile = team.files.find(f => f.url === result.secure_url);
+//                     if (!existingFile) {
+//                         team.files.push(fileObject);
+//                     }
+//                 } catch (uploadError) {
+//                     console.error(`Error uploading file ${fileName}:`, uploadError);
+//                     // Continue with next file
+//                 }
+//             }
+//         }
+
+//         // 3. Handle single file (backward compatibility)
+//         if (req.body.file && req.body.file.startsWith('data:')) {
+//             const fileData = req.body.file;
+//             const fileName = req.body.fileName || 'File';
+//             const fileDescription = req.body.fileDescription || '';
+
+//             try {
+//                 const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,/);
+//                 const mimeType = matches ? matches[1] : 'application/octet-stream';
+                
+//                 let resourceType = 'auto';
+//                 if (mimeType.startsWith('image/')) {
+//                     resourceType = 'image';
+//                 } else if (mimeType.startsWith('video/')) {
+//                     resourceType = 'video';
+//                 } else {
+//                     resourceType = 'raw';
+//                 }
+
+//                 const uploadOptions = {
+//                     folder: `team_files/${id}`,
+//                     resource_type: resourceType,
+//                     public_id: `${Date.now()}-${fileName.split('.')[0].replace(/\s/g, '_')}`,
+//                     use_filename: true,
+//                     unique_filename: true,
+//                 };
+
+//                 if (mimeType === 'application/pdf') {
+//                     uploadOptions.format = 'pdf';
+//                     uploadOptions.resource_type = 'raw';
+//                 }
+
+//                 const result = await cloudinary.uploader.upload(fileData, uploadOptions);
+
+//                 const fileObject = {
+//                     name: fileName,
+//                     url: result.secure_url,
+//                     fileSize: result.bytes || 0,
+//                     fileType: mimeType,
+//                     publicId: result.public_id,
+//                     uploadedBy: userId,
+//                     uploadedAt: new Date(),
+//                     description: fileDescription
+//                 };
+
+//                 if (!team.files) {
+//                     team.files = [];
+//                 }
+//                 const existingFile = team.files.find(f => f.url === result.secure_url);
+//                 if (!existingFile) {
+//                     team.files.push(fileObject);
+//                 }
+//             } catch (uploadError) {
+//                 console.error('Error uploading file:', uploadError);
+//             }
+//         }
+
+//         // Save updated team
+//         const updatedTeam = await Team.findByIdAndUpdate(
+//             id,
+//             updateData,
+//             { new: true, runValidators: true }
+//         )
+//         .populate('members', 'name email profilePic')
+//         .populate('createdBy', 'name email profilePic');
+
+//         // Notify all team members
+//         if (team.members && team.members.length > 0) {
+//             team.members.forEach(memberId => {
+//                 const socketId = userSocketMap[memberId.toString()];
+//                 if (socketId) {
+//                     io.to(socketId).emit('teamUpdated', {
+//                         teamId: id,
+//                         team: updatedTeam,
+//                         message: `Team "${updatedTeam.name}" has been updated`
+//                     });
+//                 }
+//             });
+//         }
+
+//         res.json({
+//             success: true,
+//             team: updatedTeam,
+//             message: 'Team updated successfully',
+//             filesCount: updatedTeam.files?.length || 0
+//         });
+
+//     } catch (error) {
+//         console.error('Update team error:', error);
+//         res.status(500).json({
+//             success: false,
+//             message: error.message || 'Failed to update team'
+//         });
+//     }
+// };
+
+// controllers/teamController.js - Fixed updateTeam function
+
 export const updateTeam = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user._id;
-        const {name, description, isPrivate, coverImage} = req.body;
+        const { 
+            name, 
+            description, 
+            isPrivate, 
+            coverImg,
+            files,        // Array of base64 file data
+            fileNames     // Array of file names
+        } = req.body;
 
+        console.log('📝 Updating team:', id);
+        console.log('📎 Files received:', files?.length || 0);
+        console.log('📎 File names received:', fileNames);
+
+        // Find team
         const team = await Team.findById(id);
         if (!team) {
+            console.log('❌ Team not found:', id);
             return res.status(404).json({
                 success: false,
                 message: 'Team not found'
             });
         }
 
+        console.log('✅ Team found:', team.name);
+        console.log('📊 Current files in team:', team.files?.length || 0);
+
+        // Check if user is admin
         if (!isTeamAdmin(team, userId)) {
+            console.log('❌ User not admin:', userId);
             return res.status(403).json({
                 success: false,
                 message: 'Only the team creator can update team details'
             });
         }
 
+        // Build update data
         let updateData = {
             name: name || team.name,
             description: description !== undefined ? description : team.description,
             isPrivate: isPrivate !== undefined ? isPrivate : team.isPrivate
         };
 
-        if (coverImage) {
-            // Check if it's a base64 image
-            if (coverImage.startsWith('data:image')) {
-                // Upload to Cloudinary
-                const uploadResponse = await cloudinary.uploader.upload(coverImage, {
+        // 1. Handle cover image (base64)
+        if (coverImg) {
+            console.log('🖼️ Processing cover image...');
+            if (coverImg.startsWith('data:image')) {
+                const uploadResponse = await cloudinary.uploader.upload(coverImg, {
                     folder: 'team_cover_images',
                     transformation: [
                         { width: 1200, height: 400, crop: 'fill' },
@@ -114,14 +351,114 @@ export const updateTeam = async (req, res) => {
                         { fetch_format: 'auto' }
                     ]
                 });
-                updateData.coverImage = uploadResponse.secure_url;
+                updateData.coverImg = uploadResponse.secure_url;
+                console.log('✅ Cover image uploaded:', uploadResponse.secure_url);
             } else {
-                // If it's already a URL, use it directly
-                updateData.coverImage = coverImage;
+                updateData.coverImg = coverImg;
             }
         }
 
-         const updatedTeam = await Team.findByIdAndUpdate(
+        // 2. Handle multiple files (base64 array)
+        if (files && Array.isArray(files) && files.length > 0) {
+            console.log(`📎 Processing ${files.length} files...`);
+            
+            // ✅ FIX: Initialize files array if it doesn't exist
+            if (!team.files) {
+                team.files = [];
+            }
+
+            // ✅ FIX: Store current file count before adding
+            const initialFileCount = team.files.length;
+            console.log(`📊 Initial files count: ${initialFileCount}`);
+
+            // Process each file
+            const uploadedFiles = [];
+            for (let i = 0; i < files.length; i++) {
+                const fileData = files[i];
+                const fileName = fileNames && fileNames[i] ? fileNames[i] : `File ${i + 1}`;
+
+                // Skip if file data is not valid
+                if (!fileData || !fileData.startsWith('data:')) {
+                    console.log(`⚠️ Skipping invalid file data at index ${i}`);
+                    continue;
+                }
+
+                try {
+                    console.log(`📤 Uploading file ${i + 1}: ${fileName}...`);
+                    
+                    // Extract mime type from base64
+                    const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,/);
+                    const mimeType = matches ? matches[1] : 'application/octet-stream';
+                    
+                    // Determine resource type for Cloudinary
+                    let resourceType = 'auto';
+                    if (mimeType.startsWith('image/')) {
+                        resourceType = 'image';
+                    } else if (mimeType.startsWith('video/')) {
+                        resourceType = 'video';
+                    } else {
+                        resourceType = 'raw';
+                    }
+
+                    // Upload to Cloudinary
+                    const uploadOptions = {
+                        folder: `team_files/${id}`,
+                        resource_type: resourceType,
+                        public_id: `${Date.now()}-${fileName.split('.')[0].replace(/\s/g, '_')}`,
+                        use_filename: true,
+                        unique_filename: true,
+                    };
+
+                    // Handle PDF specifically
+                    if (mimeType === 'application/pdf') {
+                        uploadOptions.format = 'pdf';
+                        uploadOptions.resource_type = 'raw';
+                    }
+
+                    const result = await cloudinary.uploader.upload(fileData, uploadOptions);
+                    console.log(`✅ File ${i + 1} uploaded:`, result.secure_url);
+
+                    // ✅ FIX: Create file object with required fields
+                    const fileObject = {
+                        _id: new mongoose.Types.ObjectId(),
+                        name: fileName,
+                        url: result.secure_url,
+                        fileSize: result.bytes || 0,
+                        fileType: mimeType,
+                        publicId: result.public_id,
+                        uploadedBy: userId,
+                        uploadedAt: new Date(),
+                        description: ''
+                    };
+
+                    // ✅ FIX: Check if file already exists (prevent duplicates)
+                    const existingFile = team.files.find(f => f.url === result.secure_url);
+                    if (!existingFile) {
+                        team.files.push(fileObject);
+                        uploadedFiles.push(fileObject);
+                        console.log(`✅ File ${i + 1} added to team`);
+                    } else {
+                        console.log(`⚠️ File ${i + 1} already exists`);
+                    }
+                } catch (uploadError) {
+                    console.error(`❌ Error uploading file ${fileName}:`, uploadError);
+                    // Continue with next file
+                }
+            }
+
+            console.log(`📊 Uploaded ${uploadedFiles.length} new files`);
+            console.log(`📊 Total files now: ${team.files.length}`);
+        }
+
+        // ✅ FIX: Log final file count before saving
+        console.log(`💾 Saving team with ${team.files.length} files...`);
+
+        // ✅ FIX: Save the team with the updated files array
+        // We need to save before updating with findByIdAndUpdate
+        await team.save();
+
+        // Then update other fields
+        const updatedTeam = await Team.findByIdAndUpdate(
             id,
             updateData,
             { new: true, runValidators: true }
@@ -129,26 +466,40 @@ export const updateTeam = async (req, res) => {
         .populate('members', 'fullName email profilePic status')
         .populate('createdBy', 'fullName email profilePic');
 
+        // ✅ FIX: Make sure files are included in the response
+        // The files should already be in the team from the save above
+        // But if not, we need to merge them
+        if (team.files && team.files.length > 0) {
+            updatedTeam.files = team.files;
+            await updatedTeam.save();
+        }
+
+        console.log(`✅ Team updated with ${updatedTeam.files?.length || 0} files`);
+
         // Notify all team members
-        team.members.forEach(memberId => {
-            const socketId = userSocketMap[memberId.toString()];
-            if (socketId) {
-                io.to(socketId).emit('teamUpdated', {
-                    teamId: id,
-                    team: updatedTeam,
-                    message: `Team "${updatedTeam.name}" has been updated`
-                });
-            }
-        });
+        if (updatedTeam.members && updatedTeam.members.length > 0) {
+            updatedTeam.members.forEach(memberId => {
+                const socketId = userSocketMap[memberId.toString()];
+                if (socketId) {
+                    io.to(socketId).emit('teamUpdated', {
+                        teamId: id,
+                        team: updatedTeam,
+                        message: `Team "${updatedTeam.name}" has been updated`
+                    });
+                }
+            });
+        }
 
         res.json({
             success: true,
             team: updatedTeam,
-            message: 'Team updated successfully'
+            message: 'Team updated successfully',
+            filesCount: updatedTeam.files?.length || 0,
+            uploadedFiles: team.files || []
         });
 
     } catch (error) {
-        console.error('Update team error:', error);
+        console.error('❌ Update team error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to update team'
@@ -645,3 +996,184 @@ export const joinTeamByInvite = async (req, res) => {
         });
     }
 };
+
+// controllers/teamController.js - Fixed removeFileFromTeam
+
+// ===== REMOVE FILE FROM TEAM =====
+export const removeFileFromTeam = async (req, res) => {
+    try {
+        const { id, fileId } = req.params;
+        const userId = req.user._id;
+
+        console.log('🗑️ Removing file:', fileId, 'from team:', id);
+
+        const team = await Team.findById(id);
+        if (!team) {
+            return res.status(404).json({
+                success: false,
+                message: 'Team not found'
+            });
+        }
+
+        if (!isTeamAdmin(team, userId)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only the team creator can remove files'
+            });
+        }
+
+        // ✅ FIX: Safe file check
+        if (!team.files || team.files.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No files found in team'
+            });
+        }
+
+        // ✅ FIX: Find the file with safe ID comparison
+        const fileIndex = team.files.findIndex(f => {
+            if (!f) return false;
+            const fId = f._id || f.id;
+            return fId && fId.toString() === fileId;
+        });
+
+        if (fileIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'File not found'
+            });
+        }
+
+        const file = team.files[fileIndex];
+
+        // Delete from Cloudinary if publicId exists
+        if (file.publicId) {
+            try {
+                await cloudinary.uploader.destroy(file.publicId, {
+                    resource_type: file.fileType && file.fileType.startsWith('image/') ? 'image' : 'raw'
+                });
+                console.log('✅ File deleted from Cloudinary');
+            } catch (cloudinaryError) {
+                console.error('Cloudinary delete error:', cloudinaryError);
+            }
+        }
+
+        // Remove file from team
+        team.files.splice(fileIndex, 1);
+        await team.save();
+        console.log('✅ File removed from team');
+
+        const populatedTeam = await Team.findById(id)
+            .populate('members', 'fullName email profilePic status')
+            .populate('createdBy', 'fullName email profilePic');
+
+        // Notify team members
+        if (team.members && team.members.length > 0) {
+            team.members.forEach(memberId => {
+                const socketId = userSocketMap[memberId.toString()];
+                if (socketId) {
+                    io.to(socketId).emit('teamFileRemoved', {
+                        teamId: id,
+                        fileId: fileId,
+                        team: populatedTeam,
+                        message: `File "${file.name || 'Unknown'}" was removed from the team`
+                    });
+                }
+            });
+        }
+
+        res.json({
+            success: true,
+            team: populatedTeam,
+            message: 'File removed successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Remove file error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to remove file'
+        });
+    }
+};
+
+// ===== GET TEAM FILES =====
+// controllers/teamController.js - Fixed getTeamFiles function
+
+// ===== GET TEAM FILES =====
+export const getTeamFiles = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user._id;
+
+        // Find team and populate members
+        const team = await Team.findById(id)
+            .populate('name', 'fullName email profilePic');
+
+        if (!team) {
+            return res.status(404).json({
+                success: false,
+                message: 'Team not found'
+            });
+        }
+
+        // Check if user is a member or admin
+        const isAdmin = isTeamAdmin(team, userId);
+        const isMember = team.members ? team.members.some(m => {
+            const memberId = m._id || m;
+            return memberId.toString() === userId.toString();
+        }) : false;
+        
+        if (!isAdmin && !isMember) {
+            return res.status(403).json({
+                success: false,
+                message: 'You do not have access to this team'
+            });
+        }
+
+        // ✅ FIX: Get files safely
+        const files = team.files || [];
+        console.log(team);
+        
+        
+        // ✅ FIX: Format files for response with proper checking
+        const formattedFiles = files.map(file => {
+            // Handle both cases: file is an object with _id or file._id is undefined
+            return {
+                _id: file._id || file.id || null,
+                name: file.name || 'Unnamed file',
+                url: file.url || '',
+                fileSize: file.fileSize || 0,
+                fileType: file.fileType || '',
+                publicId: file.publicId || '',
+                uploadedBy: file.uploadedBy || null,
+                uploadedAt: file.uploadedAt || new Date(),
+                description: file.description || ''
+            };
+        });
+
+        // Sort by uploadedAt descending (newest first)
+        const sortedFiles = formattedFiles.sort((a, b) => {
+            const dateA = a.uploadedAt ? new Date(a.uploadedAt) : new Date(0);
+            const dateB = b.uploadedAt ? new Date(b.uploadedAt) : new Date(0);
+            return dateB - dateA;
+        });
+
+        // ✅ FIX: Remove any null entries
+        const validFiles = sortedFiles.filter(file => file.url);
+
+        res.json({
+            success: true,
+            files: validFiles,
+            count: validFiles.length
+        });
+
+    } catch (error) {
+        console.error('❌ Get team files error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to get team files'
+        });
+    }
+};
+
