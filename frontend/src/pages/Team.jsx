@@ -21,6 +21,9 @@ import CreateTeamModal from '../components/modals/CreateTeamModal';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
+import TeamFiles from '../components/TeamFiles';
+import TeamFileList from '../components/TeamFileList';
+
 const Team = () => {
     const [view, setView] = useState('grid');
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +58,7 @@ const Team = () => {
         name: '',
         description: '',
         isPrivate: false,
-        coverImage: null,
+        coverImg: null,
         coverPreview: null
     });
     const [isUpdatingTeam, setIsUpdatingTeam] = useState(false);
@@ -66,8 +69,50 @@ const Team = () => {
     const fileInputRef = useRef(null);
     const coverInputRef = useRef(null);
 
+    const [selectedImg, setSelectedImg] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+
+    const [fileUploaded, setFileUploaded] = useState(false);
+
+    const handleFileUploaded = (updatedTeam) => {
+    if (updatedTeam) {
+        // Update selectedTeam with new files
+        setSelectedTeam(updatedTeam);
+        // Also update in teams array
+        setTeams(prev => 
+            prev.map(team => 
+                team._id === updatedTeam._id ? updatedTeam : team
+            )
+        );
+        toast.success('Files uploaded successfully!');
+    }
+    setFileUploaded(prev => !prev);
+};
+
+const handleFileDeleted = (fileId) => {
+    if (selectedTeam && selectedTeam.files) {
+        // Remove the deleted file from selectedTeam
+        const updatedFiles = selectedTeam.files.filter(f => 
+            (f._id || f.id) !== fileId
+        );
+        const updatedTeam = {
+            ...selectedTeam,
+            files: updatedFiles
+        };
+        setSelectedTeam(updatedTeam);
+        // Also update in teams array
+        setTeams(prev => 
+            prev.map(team => 
+                team._id === updatedTeam._id ? updatedTeam : team
+            )
+        );
+    }
+    setFileUploaded(prev => !prev);
+};
+
     const { 
         teams, 
+        setTeams,
         fetchTeams, 
         getTeamById,
         addTeamMember,
@@ -131,17 +176,17 @@ const Team = () => {
 
     // Open edit modal with team data
     const openEditTeamModal = () => {
-        if (selectedTeam) {
-            setEditTeamData({
-                name: selectedTeam.name || '',
-                description: selectedTeam.description || '',
-                isPrivate: selectedTeam.isPrivate || false,
-                coverImage: selectedTeam.coverImg || null,
-                coverPreview: selectedTeam.coverImg || null
-            });
-            setShowEditTeamModal(true);
-        }
-    };
+    if (selectedTeam) {
+        setEditTeamData({
+            name: selectedTeam.name || '',
+            description: selectedTeam.description || '',
+            isPrivate: selectedTeam.isPrivate || false,
+            coverImg: selectedTeam.coverImg || null,  // Get from coverImg field
+            coverPreview: selectedTeam.coverImg || null
+        });
+        setShowEditTeamModal(true);
+    }
+};
 
     // Handle cover image change
     const handleCoverImageChange = (e) => {
@@ -158,13 +203,16 @@ const Team = () => {
             toast.error('Image must be less than 5MB');
             return;
         }
+        
+        setSelectedImg(file);
+        setPreviewUrl(URL.createObjectURL(file));
 
         const reader = new FileReader();
         reader.onload = (event) => {
             setEditTeamData(prev => ({
                 ...prev,
-                coverImage: file,
-                coverPreview: event.target.result
+                coverImg: file,  // Store the file object
+                coverPreview: event.target.result  // Store the preview URL
             }));
         };
         reader.readAsDataURL(file);
@@ -172,13 +220,25 @@ const Team = () => {
 
     // Remove cover image
     const removeCoverImage = () => {
+        // setEditTeamData(prev => ({
+        //     ...prev,
+        //     coverImage: null,
+        //     coverPreview: null
+        // }));
+        // if (coverInputRef.current) {
+        //     coverInputRef.current.value = '';
+        // }
+        setSelectedImg(null);
+        setPreviewUrl(null);
+
         setEditTeamData(prev => ({
             ...prev,
-            coverImage: null,
+            coverImg: null,
             coverPreview: null
         }));
-        if (coverInputRef.current) {
-            coverInputRef.current.value = '';
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -196,37 +256,69 @@ const Team = () => {
 
     try {
         // Prepare update data as JSON
-        const updateData = {
+        let updateData = {
             name: editTeamData.name.trim(),
             description: editTeamData.description.trim(),
             isPrivate: editTeamData.isPrivate
         };
 
-        // Handle cover image if it exists and is not a string URL
-        if (editTeamData.coverImage && typeof editTeamData.coverImage !== 'string') {
-            // If it's a File object (has name property)
-            if (editTeamData.coverImage.name) {
-                const reader = new FileReader();
-                const base64Image = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(editTeamData.coverImage);
-                });
-                updateData.coverImage = base64Image;
-            }
-        } else if (editTeamData.coverImage && typeof editTeamData.coverImage === 'string') {
-            // If it's already a URL or base64 string
-            updateData.coverImage = editTeamData.coverImage;
+        // Handle cover image - use coverImg to match backend
+        if (editTeamData.coverImg) {
+            const reader = new FileReader()
+            const base64Image = await new Promise((resolve, reject) => {
+                reader.onload = () => resolve(reader.result)
+                reader.onerror = reject;
+                reader.readAsDataURL(editTeamData.coverImg);
+            })
+            updateData.coverImg = base64Image
+            // If it's a File object
+            // if (typeof editTeamData.coverImage === 'object' && editTeamData.coverImage.name) {
+            //     const reader = new FileReader();
+            //     const base64Image = await new Promise((resolve, reject) => {
+            //         reader.onload = () => resolve(reader.result);
+            //         reader.onerror = reject;
+            //         reader.readAsDataURL(editTeamData.coverImage);
+            //     });
+            //     updateData.coverImg = base64Image;  // Use coverImg (not coverImage)
+        } else if (typeof editTeamData.coverImg === 'string') {
+            updateData.coverImg = editTeamData.coverImg;
         }
+            // If it's already a URL or base64 string
+            // else if (typeof editTeamData.coverImage === 'string') {
+            //     updateData.coverImg = editTeamData.coverImage;  // Use coverImg (not coverImage)
+            // }
+        // }
 
         const result = await updateTeam(selectedTeam._id, updateData);
+            
+            if (result?.success) {
+                // setSuccess(true);
+                setShowEditTeamModal(false);
+                await loadTeamDetails(selectedTeam._id);
+                await fetchTeams();
+                toast.success('Team updated successfully!');
+                
+                // Navigate after a short delay to show success message
+                // setTimeout(() => {
+                //     navigate('/dashboard');
+                // }, 1500);
+                
+                console.log(result);
+            } else {
+                setError(result?.message || 'Failed to update profile');
+                toast.error(result?.message || 'Failed to update profile');
+            }
+
+        // console.log('Updating team with data:', updateData); // Debug log
+
+        // const result = await updateTeam(selectedTeam._id, updateData);
         
-        if (result) {
-            setShowEditTeamModal(false);
-            await loadTeamDetails(selectedTeam._id);
-            await fetchTeams();
-            toast.success('Team updated successfully!');
-        }
+        // if (result) {
+        //     setShowEditTeamModal(false);
+        //     await loadTeamDetails(selectedTeam._id);
+        //     await fetchTeams();
+        //     toast.success('Team updated successfully!');
+        // }
     } catch (err) {
         console.error('Failed to update team:', err);
         setError(err.response?.data?.message || 'Failed to update team. Please try again.');
@@ -1328,6 +1420,36 @@ const Team = () => {
                         </div>
                     </>
                 )}
+
+                // pages/Team.jsx - Add null checks around selectedTeam usage
+
+{/* Team Files Section - Add this with proper null check */}
+{selectedTeam && selectedTeam._id && (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                <File className="w-5 h-5" />
+                Team Files
+            </h3>
+            {!viewOnlyMode && isTeamAdmin() && selectedTeam && selectedTeam._id && (
+                <TeamFiles 
+                    teamId={selectedTeam._id} 
+                    onFileUploaded={handleFileUploaded}
+                />
+            )}
+        </div>
+        <div className="p-4">
+            {selectedTeam && selectedTeam._id && (
+                <TeamFileList
+                files={selectedTeam.files || []}
+                teamId={selectedTeam._id}
+                onFileDeleted={handleFileDeleted}
+                isAdmin={isTeamAdmin()}
+                />
+            )}
+        </div>
+    </div>
+)}
 
                 {/* Add Members Modal */}
                 {showAddMemberModal && (

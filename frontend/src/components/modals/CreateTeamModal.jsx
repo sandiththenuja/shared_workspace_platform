@@ -238,7 +238,7 @@ const CreateTeamModal = ({
                         </div>
 
                         {/* Team Image */}
-                        <div>
+                        {/* <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                                 Team Image (Optional)
                             </label>
@@ -290,7 +290,7 @@ const CreateTeamModal = ({
                                     <p>JPEG, PNG, GIF or WebP (max 5MB)</p>
                                 </div>
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* Description */}
                         <div>

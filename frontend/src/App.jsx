@@ -12,7 +12,7 @@ import Files from './pages/Files'
 import Team from './pages/Team'
 import Analytics from './pages/Analytics'
 import Calendar from './pages/Calendar'
-import Settings from './pages/Settings'
+import Canvas from './pages/Canvas'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
         <Route path='/team' element={<ProtectedRoute><Team /></ProtectedRoute>} />
         <Route path='/analytics' element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path='/calendar' element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-        <Route path='/settings' element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path='/canvas' element={<ProtectedRoute><Canvas /></ProtectedRoute>} />
         <Route path='/profile' element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       </Routes>
     </div>

@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { ChatProvider } from './context/ChatContext.jsx'
 import { TaskProvider } from './context/TaskContext.jsx'
 import { TeamProvider } from './context/TeamContext.jsx'
+import { FileProvider } from './context/FileContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -15,7 +16,9 @@ createRoot(document.getElementById('root')).render(
       <ChatProvider>
         <TaskProvider>
           <TeamProvider>
-            <App />
+            <FileProvider>
+              <App />
+            </FileProvider>
           </TeamProvider>
         </TaskProvider>
       </ChatProvider>

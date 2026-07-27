@@ -133,7 +133,12 @@ export const TeamProvider = ({ children }) => {
         setError(null);
         
         try {
-            const { data } = await axios.put(`/api/teams/${teamId}`, updateData);
+            const { data } = await axios.put(`/api/teams/${teamId}`, updateData, {
+                headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'  // ✅ Add this line
+            }
+            });
             if (data.success) {
                 // Update team in state
                 setTeams(prev => 
@@ -143,7 +148,7 @@ export const TeamProvider = ({ children }) => {
                 );
                 setCurrentTeam(data.team);
                 toast.success(data.message || 'Team updated successfully!');
-                return data.team;
+                return {success: true, team: data.team};
             }
         } catch (error) {
             console.error('Update team error:', error);
