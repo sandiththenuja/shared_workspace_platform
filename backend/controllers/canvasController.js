@@ -1,6 +1,7 @@
 // controllers/canvasController.js
 import Canvas from "../models/Canvas.js";
 import Team from "../models/Team.js";
+import User from "../models/User.js"; // <-- ADD THIS IMPORT
 import { io, userSocketMap } from "../server.js";
 
 // ===== HELPER FUNCTIONS =====
@@ -60,7 +61,8 @@ export const createCanvas = async (req, res) => {
             teamId,
             createdBy: userId,
             isPublic: isPublic || false,
-            tags: tags || []
+            tags: tags || [],
+            drawingData: { lines: [], shapes: [], texts: [] } // Initialize with empty data
         });
 
         const populatedCanvas = await Canvas.findById(canvas._id)
@@ -68,16 +70,18 @@ export const createCanvas = async (req, res) => {
             .populate('collaborators.user', 'fullName email profilePic');
 
         // Notify team members
-        team.members.forEach(memberId => {
-            const socketId = userSocketMap[memberId.toString()];
-            if (socketId && memberId.toString() !== userId.toString()) {
-                io.to(socketId).emit('canvasCreated', {
-                    canvas: populatedCanvas,
-                    teamId: teamId,
-                    message: `${req.user.fullName} created a new canvas: ${name}`
-                });
-            }
-        });
+        if (team.members) {
+            team.members.forEach(memberId => {
+                const socketId = userSocketMap[memberId.toString()];
+                if (socketId && memberId.toString() !== userId.toString()) {
+                    io.to(socketId).emit('canvasCreated', {
+                        canvas: populatedCanvas,
+                        teamId: teamId,
+                        message: `${req.user.fullName} created a new canvas: ${name}`
+                    });
+                }
+            });
+        }
 
         res.status(201).json({
             success: true,
@@ -151,6 +155,12 @@ export const getCanvasById = async (req, res) => {
                 success: false,
                 message: 'Canvas not found'
             });
+        }
+
+        // Ensure drawingData has default structure
+        if (!canvas.drawingData) {
+            canvas.drawingData = { lines: [], shapes: [], texts: [] };
+            await canvas.save();
         }
 
         const team = await Team.findById(canvas.teamId);
@@ -227,11 +237,11 @@ export const updateCanvas = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-        .populate('createdBy', 'fullName email profilePic')
-        .populate('collaborators.user', 'fullName email profilePic');
+        .populate('createdBy', 'name email profilePic')
+        .populate('collaborators.user', 'name email profilePic');
 
         const team = await Team.findById(canvas.teamId);
-        if (team) {
+        if (team && team.members) {
             team.members.forEach(memberId => {
                 const socketId = userSocketMap[memberId.toString()];
                 if (socketId) {
@@ -283,7 +293,7 @@ export const deleteCanvas = async (req, res) => {
         const team = await Team.findById(canvas.teamId);
         await Canvas.findByIdAndDelete(id);
 
-        if (team) {
+        if (team && team.members) {
             team.members.forEach(memberId => {
                 const socketId = userSocketMap[memberId.toString()];
                 if (socketId) {

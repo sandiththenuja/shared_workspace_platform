@@ -1,10 +1,10 @@
 // models/Canvas.js
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const canvasSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: [true, 'Canvas name is required'],
+        required: true,
         trim: true
     },
     description: {
@@ -21,37 +21,6 @@ const canvasSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    // Drawing data stored as JSON
-    drawingData: {
-        type: Object,
-        default: {
-            shapes: [],
-            lines: [],
-            text: [],
-            images: []
-        }
-    },
-    // Canvas size
-    canvasSize: {
-        width: { type: Number, default: 1200 },
-        height: { type: Number, default: 800 }
-    },
-    // Background settings
-    background: {
-        type: String,
-        default: '#ffffff'
-    },
-    // Sharing settings
-    isPublic: {
-        type: Boolean,
-        default: false
-    },
-    // Tags for organization
-    tags: [{
-        type: String,
-        trim: true
-    }],
-    // Collaborators
     collaborators: [{
         user: {
             type: mongoose.Schema.Types.ObjectId,
@@ -59,21 +28,67 @@ const canvasSchema = new mongoose.Schema({
         },
         role: {
             type: String,
-            enum: ['editor', 'viewer'],
+            enum: ['viewer', 'editor'],
             default: 'viewer'
+        },
+        joinedAt: {
+            type: Date,
+            default: Date.now
         }
     }],
-    // Last active
+    drawingData: {
+        lines: [{
+            id: String,
+            points: [Number],
+            color: String,
+            width: Number,
+            tool: String
+        }],
+        shapes: [{
+            id: String,
+            x: Number,
+            y: Number,
+            width: Number,
+            height: Number,
+            radius: Number,
+            color: String,
+            strokeWidth: Number,
+            tool: String
+        }],
+        texts: [{
+            id: String,
+            x: Number,
+            y: Number,
+            text: String,
+            fontSize: Number,
+            color: String,
+            tool: String
+        }]
+    },
+    background: {
+        type: String,
+        default: '#ffffff'
+    },
+    canvasSize: {
+        width: { type: Number, default: 1200 },
+        height: { type: Number, default: 800 }
+    },
+    isPublic: {
+        type: Boolean,
+        default: false
+    },
+    tags: [String],
     lastActive: {
         type: Date,
         default: Date.now
+    },
+    version: {
+        type: Number,
+        default: 1
     }
-}, { timestamps: true });
+}, {
+    timestamps: true
+});
 
-// Indexes
-canvasSchema.index({ teamId: 1, createdAt: -1 });
-canvasSchema.index({ createdBy: 1 });
-
-const Canvas = mongoose.model("Canvas", canvasSchema);
-
+const Canvas = mongoose.model('Canvas', canvasSchema);
 export default Canvas;

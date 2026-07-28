@@ -13,26 +13,23 @@ import {
 
 const canvasRouter = express.Router();
 
-// All routes require authentication
-canvasRouter.use(protectRoute);
-
 // Create canvas
-canvasRouter.post('/', createCanvas);
+canvasRouter.post('/', protectRoute, createCanvas);
 
 // Get team canvases
-canvasRouter.get('/team/:teamId', getTeamCanvases);
+canvasRouter.get('/team/:teamId', protectRoute, getTeamCanvases);
 
 // Get single canvas
-canvasRouter.get('/:id', getCanvasById);
+canvasRouter.get('/:id', protectRoute, getCanvasById);
 
 // Update canvas
-canvasRouter.put('/:id', updateCanvas);
+canvasRouter.put('/:id', protectRoute, updateCanvas);
 
 // Delete canvas
-canvasRouter.delete('/:id', deleteCanvas);
+canvasRouter.delete('/:id', protectRoute, deleteCanvas);
 
 // Collaborators
-canvasRouter.post('/:id/collaborators', addCollaborator);
-canvasRouter.delete('/:id/collaborators/:collaboratorId', removeCollaborator);
+canvasRouter.post('/:id/collaborators', protectRoute, addCollaborator);
+canvasRouter.delete('/:id/collaborators/:collaboratorId', protectRoute, removeCollaborator);
 
 export default canvasRouter;
