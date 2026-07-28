@@ -12,8 +12,8 @@ import Files from './pages/Files'
 import Team from './pages/Team'
 import Analytics from './pages/Analytics'
 import Calendar from './pages/Calendar'
-import Canvas from './pages/Canvas'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import CanvasDashboard from './pages/CanvasDashboard'
 
 function App() {
   const {authUser} = useContext(AuthContext)
@@ -31,7 +31,8 @@ function App() {
         <Route path='/team' element={<ProtectedRoute><Team /></ProtectedRoute>} />
         <Route path='/analytics' element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path='/calendar' element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-        <Route path='/canvas' element={<ProtectedRoute><Canvas /></ProtectedRoute>} />
+        {/* <Route path='/canvas' element={<ProtectedRoute><CanvasDashboard /></ProtectedRoute>} /> */}
+        {/* <Route path="/canvas/:teamId" element={<ProtectedRoute><CanvasDashboard /></ProtectedRoute>} /> */}
         <Route path='/profile' element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       </Routes>
     </div>

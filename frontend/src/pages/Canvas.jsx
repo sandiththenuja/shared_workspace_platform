@@ -1,4 +1,4 @@
-// components/Canvas.jsx - Polotno + Konva Integration
+// components/Canvas.jsx - Fixed Save Functionality
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
@@ -284,13 +284,13 @@ const CanvasSidePanel = ({ onClose, collaborators = [], pages = [] }) => {
                     </h4>
                     <div className="space-y-2">
                         {collaborators.map((collab) => (
-                            <div key={collab.user._id} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div key={collab.user?._id || Math.random()} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium">
-                                    {collab.user.fullName?.charAt(0) || 'U'}
+                                    {collab.user?.fullName?.charAt(0) || 'U'}
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-sm font-medium text-slate-800 dark:text-white">
-                                        {collab.user.fullName || 'Unknown User'}
+                                        {collab.user?.fullName || 'Unknown User'}
                                     </p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">
                                         {collab.role || 'Viewer'}
@@ -402,6 +402,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
     const [pages, setPages] = useState([{ id: 1, objects: 0 }]);
     const [currentPage, setCurrentPage] = useState(0);
     const [loadingMessage, setLoadingMessage] = useState('Initializing canvas...');
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     
     // Refs
     const stageRef = useRef(null);
@@ -409,6 +410,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
     const { authUser } = useAuth();
     const { socket } = useSocket(authUser?._id);
     const loadTimerRef = useRef(null);
+    const saveTimeoutRef = useRef(null);
 
     // Initialize Konva stage
     useEffect(() => {
@@ -452,11 +454,13 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         };
     }, []);
 
-    // Fetch canvas data
+    // Fetch canvas data when canvasId changes
     useEffect(() => {
         if (canvasId && isCanvasReady) {
             setLoadingMessage('Loading canvas data...');
             fetchCanvas();
+        } else if (!canvasId) {
+            setIsLoading(false);
         }
     }, [canvasId, isCanvasReady]);
 
@@ -477,6 +481,8 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                 throw new Error('Authentication token not found');
             }
 
+            console.log('Fetching canvas with ID:', canvasId);
+
             const response = await axios.get(`/api/canvases/${canvasId}`, {
                 headers: { 'Authorization': `Bearer ${token}` },
                 timeout: 10000
@@ -488,19 +494,17 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
 
             setLoadingMessage('Processing canvas data...');
             setCanvas(response.data.canvas);
+            
+            // Ensure drawingData exists with proper structure
             const data = response.data.canvas.drawingData || { lines: [], shapes: [], texts: [] };
             setLines(data.lines || []);
             setShapes(data.shapes || []);
             setTexts(data.texts || []);
             setCollaborators(response.data.canvas.collaborators || []);
             
-            // Update pages
-            if (data.pages) {
-                setPages(data.pages);
-            }
-            
             setLoadingMessage('Canvas loaded successfully!');
             toast.success('Canvas loaded');
+            setHasUnsavedChanges(false);
             
         } catch (error) {
             console.error('Failed to fetch canvas:', error);
@@ -514,7 +518,117 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         }
     };
 
-    // Drawing handlers
+    // ===== SAVE FUNCTION - FIXED =====
+    const saveDrawing = useCallback(async () => {
+        // Don't save if no canvasId or already saving
+        if (!canvasId) {
+            console.warn('Cannot save: No canvasId');
+            return false;
+        }
+
+        if (isSaving) {
+            console.log('Already saving, skipping...');
+            return false;
+        }
+
+        try {
+            setIsSaving(true);
+            console.log('Saving canvas...');
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('Authentication token not found');
+            }
+
+            const drawingData = { 
+                lines, 
+                shapes, 
+                texts,
+                pages,
+                currentPage
+            };
+
+            console.log('Drawing data to save:', drawingData);
+
+            const response = await axios.put(
+                `/api/canvases/${canvasId}`,
+                { drawingData },
+                { 
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    timeout: 15000
+                }
+            );
+            
+            if (response.data.success) {
+                console.log('Canvas saved successfully');
+                setHasUnsavedChanges(false);
+                
+                // Emit socket event for real-time updates
+                if (socket) {
+                    socket.emit('drawingUpdate', { 
+                        canvasId, 
+                        drawingData,
+                        userId: authUser?._id 
+                    });
+                }
+                
+                return true;
+            } else {
+                throw new Error(response.data.message || 'Save failed');
+            }
+        } catch (error) {
+            console.error('Failed to save drawing:', error);
+            toast.error(error.response?.data?.message || 'Failed to save drawing');
+            return false;
+        } finally {
+            setIsSaving(false);
+        }
+    }, [canvasId, lines, shapes, texts, pages, currentPage, socket, isSaving]);
+
+    // ===== DEBOUNCED SAVE =====
+    const debouncedSave = useCallback(() => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        
+        setHasUnsavedChanges(true);
+        
+        saveTimeoutRef.current = setTimeout(() => {
+            saveDrawing();
+        }, 2000); // Save after 2 seconds of inactivity
+    }, [saveDrawing]);
+
+    // ===== SAVE TO HISTORY =====
+    const saveToHistory = useCallback(() => {
+        const data = { 
+            lines: JSON.parse(JSON.stringify(lines)), 
+            shapes: JSON.parse(JSON.stringify(shapes)), 
+            texts: JSON.parse(JSON.stringify(texts)) 
+        };
+        
+        // Limit history to 30 items
+        setHistory(prev => {
+            const newHistory = [...prev, data];
+            if (newHistory.length > 30) {
+                return newHistory.slice(-30);
+            }
+            return newHistory;
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 29));
+        
+        // Debounced auto-save
+        debouncedSave();
+    }, [lines, shapes, texts, debouncedSave]);
+
+    // ===== UPDATE DRAWING DATA =====
+    const updateDrawingData = useCallback((newLines, newShapes, newTexts) => {
+        setLines(newLines || []);
+        setShapes(newShapes || []);
+        setTexts(newTexts || []);
+        setHasUnsavedChanges(true);
+    }, []);
+
+    // ===== DRAWING HANDLERS =====
     const handleMouseDown = (e) => {
         if (tool === 'select' || tool === 'pan' || !isCanvasReady) return;
 
@@ -534,6 +648,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             };
             setCurrentLine(newLine);
             setLines(prev => [...prev, newLine]);
+            setHasUnsavedChanges(true);
         } else if (tool === 'rectangle') {
             const newRect = {
                 id: `rect-${Date.now()}`,
@@ -547,6 +662,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             };
             setShapes(prev => [...prev, newRect]);
             setCurrentLine(newRect);
+            setHasUnsavedChanges(true);
         } else if (tool === 'circle') {
             const newCircle = {
                 id: `circle-${Date.now()}`,
@@ -559,6 +675,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             };
             setShapes(prev => [...prev, newCircle]);
             setCurrentLine(newCircle);
+            setHasUnsavedChanges(true);
         } else if (tool === 'text') {
             const newText = {
                 id: `text-${Date.now()}`,
@@ -572,6 +689,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             setTexts(prev => [...prev, newText]);
             setCurrentLine(newText);
             setIsDrawing(false);
+            setHasUnsavedChanges(true);
             
             setTimeout(() => {
                 const textObj = texts.find(t => t.id === newText.id);
@@ -587,7 +705,8 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                             }
                             return prev;
                         });
-                        saveDrawing();
+                        setHasUnsavedChanges(true);
+                        debouncedSave();
                     }
                 }
             }, 100);
@@ -617,6 +736,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     }
                     return prev;
                 });
+                setHasUnsavedChanges(true);
             }
         } else if (tool === 'rectangle') {
             if (currentLine) {
@@ -635,6 +755,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     }
                     return prev;
                 });
+                setHasUnsavedChanges(true);
             }
         } else if (tool === 'circle') {
             if (currentLine) {
@@ -656,6 +777,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     }
                     return prev;
                 });
+                setHasUnsavedChanges(true);
             }
         }
     };
@@ -665,7 +787,6 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             setIsDrawing(false);
             setCurrentLine(null);
             saveToHistory();
-            saveDrawing();
         }
     };
 
@@ -686,53 +807,12 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                 }
                 return prev;
             });
-            saveDrawing();
+            setHasUnsavedChanges(true);
+            debouncedSave();
         }
     };
 
-    const saveToHistory = () => {
-        const data = { lines, shapes, texts };
-        setHistory(prev => [...prev, data]);
-        setHistoryIndex(prev => prev + 1);
-    };
-
-    const saveDrawing = useCallback(async () => {
-        if (!canvasId || isSaving) return;
-
-        setIsSaving(true);
-        try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('Authentication required');
-
-            const drawingData = { 
-                lines, 
-                shapes, 
-                texts,
-                pages,
-                currentPage
-            };
-
-            const response = await axios.put(
-                `/api/canvases/${canvasId}`,
-                { drawingData },
-                { 
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    timeout: 15000
-                }
-            );
-            
-            if (response.data.success) {
-                if (socket) {
-                    socket.emit('drawingUpdate', { canvasId, drawingData });
-                }
-            }
-        } catch (error) {
-            console.error('Failed to save drawing:', error);
-        } finally {
-            setIsSaving(false);
-        }
-    }, [canvasId, lines, shapes, texts, pages, currentPage, socket, isSaving]);
-
+    // ===== UNDO / REDO =====
     const undo = () => {
         if (historyIndex > 0) {
             setHistoryIndex(historyIndex - 1);
@@ -740,6 +820,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             setLines(data.lines || []);
             setShapes(data.shapes || []);
             setTexts(data.texts || []);
+            setHasUnsavedChanges(true);
         }
     };
 
@@ -750,9 +831,11 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             setLines(data.lines || []);
             setShapes(data.shapes || []);
             setTexts(data.texts || []);
+            setHasUnsavedChanges(true);
         }
     };
 
+    // ===== CLEAR CANVAS =====
     const clearCanvas = () => {
         if (!window.confirm('Clear all drawings?')) return;
         setLines([]);
@@ -760,10 +843,12 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         setTexts([]);
         setHistory([]);
         setHistoryIndex(-1);
+        setHasUnsavedChanges(true);
         saveDrawing();
         toast.success('Canvas cleared');
     };
 
+    // ===== EXPORT IMAGE =====
     const exportImage = () => {
         const stage = stageRef.current;
         if (!stage) {
@@ -783,57 +868,80 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         }
     };
 
+    // ===== SHARE =====
     const handleShare = () => {
+        const shareUrl = `${window.location.origin}/canvas/${canvasId}`;
+        navigator.clipboard.writeText(shareUrl);
         toast.success('Share link copied to clipboard!');
     };
 
+    // ===== ZOOM =====
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
     const resetZoom = () => setZoom(1);
 
+    // ===== PAGE SELECT =====
     const handlePageSelect = (index) => {
         setCurrentPage(index);
         // Load page data here
     };
 
-    // Socket listeners
+    // ===== SOCKET LISTENERS =====
     useEffect(() => {
         if (!socket) return;
 
         const handleDrawingUpdate = (data) => {
-            if (data.canvasId === canvasId) {
+            if (data.canvasId === canvasId && data.userId !== authUser?._id) {
+                console.log('Received drawing update from socket');
                 setLines(data.drawingData.lines || []);
                 setShapes(data.drawingData.shapes || []);
                 setTexts(data.drawingData.texts || []);
                 if (data.drawingData.pages) {
                     setPages(data.drawingData.pages);
                 }
+                setHasUnsavedChanges(false);
             }
         };
 
         socket.on('drawingUpdate', handleDrawingUpdate);
         socket.on('canvasUpdated', (data) => {
-            if (data.canvasId === canvasId) setCanvas(data.canvas);
+            if (data.canvasId === canvasId) {
+                setCanvas(data.canvas);
+            }
         });
 
         return () => {
             socket.off('drawingUpdate', handleDrawingUpdate);
             socket.off('canvasUpdated');
         };
-    }, [socket, canvasId]);
+    }, [socket, canvasId, authUser?._id]);
 
-    // Auto-save
+    // ===== AUTO-SAVE =====
     useEffect(() => {
         const interval = setInterval(() => {
-            if ((lines.length > 0 || shapes.length > 0 || texts.length > 0) && isCanvasReady && !isSaving) {
+            if (hasUnsavedChanges && isCanvasReady && !isSaving) {
+                console.log('Auto-saving...');
                 saveDrawing();
             }
-        }, 30000);
+        }, 30000); // Auto-save every 30 seconds
 
         return () => clearInterval(interval);
-    }, [lines, shapes, texts, saveDrawing, isCanvasReady, isSaving]);
+    }, [hasUnsavedChanges, saveDrawing, isCanvasReady, isSaving]);
 
-    // Loading state
+    // ===== CLEANUP ON UNMOUNT =====
+    useEffect(() => {
+        return () => {
+            // Save any unsaved changes before unmounting
+            if (hasUnsavedChanges && isCanvasReady) {
+                saveDrawing();
+            }
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, [hasUnsavedChanges, isCanvasReady, saveDrawing]);
+
+    // ===== LOADING STATE =====
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center h-full bg-slate-50 dark:bg-slate-900">
@@ -860,7 +968,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         );
     }
 
-    // Error state
+    // ===== ERROR STATE =====
     if (error) {
         return (
             <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-slate-900 p-4">
@@ -899,10 +1007,9 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         );
     }
 
-    // Main render
+    // ===== MAIN RENDER =====
     return (
         <CanvasContainer>
-            {/* Polotno-style layout */}
             <div className="polotno-layout flex flex-1 overflow-hidden">
                 {/* Side Panel */}
                 <SidePanelWrap isOpen={showSidePanel}>
@@ -1069,6 +1176,14 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                                 <ChevronRight className="w-4 h-4" />
                             </button>
                         )}
+
+                        {/* Unsaved Changes Indicator */}
+                        {hasUnsavedChanges && (
+                            <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 rounded-lg text-xs">
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                                <span>Unsaved changes</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Timeline/Pages */}
@@ -1093,6 +1208,12 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                         <span className="text-yellow-500 flex items-center gap-1">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             Saving...
+                        </span>
+                    )}
+                    {hasUnsavedChanges && !isSaving && (
+                        <span className="text-yellow-500 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></span>
+                            Unsaved
                         </span>
                     )}
                 </div>

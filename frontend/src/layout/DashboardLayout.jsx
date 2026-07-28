@@ -34,7 +34,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard' }) => {
         { icon: FolderOpen, label: 'Files', href: '/files', id: 'files' },
         { icon: BarChart3, label: 'Analytics', href: '/analytics', id: 'analytics' },
         { icon: Calendar, label: 'Calendar', href: '/calendar', id: 'calendar' },
-        { icon: Settings, label: 'Canvas', href: '/canvas', id: 'canvas' },
+        // { icon: Settings, label: 'Canvas', href: '/canvas', id: 'canvas' },
         { icon: Settings, label: 'Settings', href: '/profile', id: 'profile' },
     ];
 
