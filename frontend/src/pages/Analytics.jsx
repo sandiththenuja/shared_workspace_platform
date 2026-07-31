@@ -1,4 +1,3 @@
-// pages/Analytics.js
 import React, { useState, useEffect } from 'react';
 import {
     TrendingUp, TrendingDown, Users, Eye, 
@@ -10,9 +9,12 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import { useTask } from '../context/TaskContext';
+import { useTeam } from '../context/TeamContext'; // Added useTeam
 
 const Analytics = () => {
     const { tasks, getTasks, statusSummary, getTaskStatistics } = useTask();
+    const { teams, fetchTeams } = useTeam(); // Fetch teams
+    
     const [loading, setLoading] = useState(true);
     const [chatStats, setChatStats] = useState({
         totalMessages: 0,
@@ -27,27 +29,32 @@ const Analytics = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        await getTasks();
-        // Simulate chat data (replace with actual API call)
-        setChatStats({
-            totalMessages: 1293,
-            unreadMessages: 47,
-            activeConversations: 12,
-            messagesPerDay: [
-                { day: 'Mon', count: 45 },
-                { day: 'Tue', count: 52 },
-                { day: 'Wed', count: 38 },
-                { day: 'Thu', count: 65 },
-                { day: 'Fri', count: 70 },
-                { day: 'Sat', count: 48 },
-                { day: 'Sun', count: 55 }
-            ]
-        });
-        setLoading(false);
+        try {
+            await Promise.all([getTasks(), fetchTeams()]);
+            // Simulate chat data (replace with actual API call if needed)
+            setChatStats({
+                totalMessages: 1293,
+                unreadMessages: 47,
+                activeConversations: 12,
+                messagesPerDay: [
+                    { day: 'Mon', count: 45 },
+                    { day: 'Tue', count: 52 },
+                    { day: 'Wed', count: 38 },
+                    { day: 'Thu', count: 65 },
+                    { day: 'Fri', count: 70 },
+                    { day: 'Sat', count: 48 },
+                    { day: 'Sun', count: 55 }
+                ]
+            });
+        } catch (error) {
+            console.error("Error fetching analytics data:", error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Get task statistics
-    const taskStats = getTaskStatistics(tasks);
+    const taskStats = getTaskStatistics(tasks) || {};
     
     // Calculate completion rate
     const completionRate = taskStats.total > 0 
@@ -58,7 +65,7 @@ const Analytics = () => {
     const metrics = [
         { 
             label: 'Total Tasks', 
-            value: taskStats.total.toString(), 
+            value: taskStats.total?.toString() || '0', 
             change: '+12.5%', 
             positive: true, 
             icon: ListTodo,
@@ -66,7 +73,7 @@ const Analytics = () => {
         },
         { 
             label: 'Completed Tasks', 
-            value: taskStats.completed.toString(), 
+            value: taskStats.completed?.toString() || '0', 
             change: '+8.2%', 
             positive: true, 
             icon: CheckCircle,
@@ -82,7 +89,7 @@ const Analytics = () => {
         },
         { 
             label: 'Pending Tasks', 
-            value: taskStats.pending.toString(), 
+            value: taskStats.pending?.toString() || '0', 
             change: '-3.1%', 
             positive: false, 
             icon: ClockIcon,
@@ -92,9 +99,9 @@ const Analytics = () => {
 
     // Chart data for tasks by status
     const taskStatusData = [
-        { label: 'Pending', value: taskStats.pending, color: '#f59e0b' },
-        { label: 'In Progress', value: taskStats.inProgress, color: '#3b82f6' },
-        { label: 'Completed', value: taskStats.completed, color: '#10b981' }
+        { label: 'Pending', value: taskStats.pending || 0, color: '#f59e0b' },
+        { label: 'In Progress', value: taskStats.inProgress || 0, color: '#3b82f6' },
+        { label: 'Completed', value: taskStats.completed || 0, color: '#10b981' }
     ];
 
     const maxTaskValue = Math.max(...taskStatusData.map(d => d.value), 1);
@@ -108,8 +115,9 @@ const Analytics = () => {
 
     const maxPriorityValue = Math.max(...priorityData.map(d => d.value), 1);
 
-    // Recent tasks
-    const recentTasks = tasks.slice(0, 5);
+    // Extract all unique team members from all teams
+    const allTeamMembers = teams.flatMap(team => team.members || []);
+    const uniqueMembers = Array.from(new Map(allTeamMembers.map(m => [m._id, m])).values());
 
     return (
         <DashboardLayout>
@@ -187,17 +195,17 @@ const Analytics = () => {
                                     <h3 className="font-semibold text-slate-800 dark:text-white">Task Status Distribution</h3>
                                     <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                                         <span className="text-emerald-500">●</span>
-                                        <span>Completed: {taskStats.completed}</span>
+                                        <span>Completed: {taskStats.completed || 0}</span>
                                         <span className="text-blue-500">●</span>
-                                        <span>In Progress: {taskStats.inProgress}</span>
+                                        <span>In Progress: {taskStats.inProgress || 0}</span>
                                         <span className="text-amber-500">●</span>
-                                        <span>Pending: {taskStats.pending}</span>
+                                        <span>Pending: {taskStats.pending || 0}</span>
                                     </div>
                                 </div>
                                 <div className="h-64 flex items-end gap-3">
                                     {taskStatusData.map((data, index) => (
                                         <div key={index} className="flex-1 flex flex-col items-center gap-2 group">
-                                            <div className="relative w-full">
+                                            <div className="relative w-full h-full flex items-end">
                                                 <div 
                                                     className="w-full rounded-t transition-all hover:opacity-80"
                                                     style={{ 
@@ -254,137 +262,80 @@ const Analytics = () => {
                             </div>
                         </div>
 
-                        {/* Chat Analytics */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-semibold text-slate-800 dark:text-white">Message Activity</h3>
-                                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                                        <div className="flex items-center gap-1">
-                                            <div className="w-3 h-3 bg-purple-500 rounded"></div>
-                                            <span>This week</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="h-48 flex items-end gap-3">
-                                    {chatStats.messagesPerDay.map((data, index) => {
-                                        const maxMsg = Math.max(...chatStats.messagesPerDay.map(d => d.count), 1);
-                                        return (
-                                            <div key={index} className="flex-1 flex flex-col items-center gap-2 group">
-                                                <div 
-                                                    className="w-full bg-purple-500 rounded-t transition-all hover:opacity-80"
-                                                    style={{ 
-                                                        height: `${(data.count / maxMsg) * 100}%`,
-                                                        minHeight: data.count > 0 ? '10px' : '0px'
-                                                    }}
-                                                >
-                                                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                        {data.count} messages
-                                                    </div>
-                                                </div>
-                                                <span className="text-xs text-slate-500 dark:text-slate-400">{data.day}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200/80 dark:border-slate-700/80">
-                                    <div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Total Messages</p>
-                                        <p className="text-xl font-bold text-slate-800 dark:text-white">
-                                            {chatStats.totalMessages.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Unread</p>
-                                        <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                                            {chatStats.unreadMessages}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Active Conversations</p>
-                                        <p className="text-xl font-bold text-slate-800 dark:text-white">
-                                            {chatStats.activeConversations}
-                                        </p>
-                                    </div>
-                                </div>
+                        {/* Team Members Grid */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-indigo-500" />
+                                    Team Members ({uniqueMembers.length})
+                                </h3>
                             </div>
-
-                            {/* Quick Stats Card */}
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
-                                <h3 className="font-semibold text-slate-800 dark:text-white mb-4">Task Overview</h3>
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
-                                                <ListTodo className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">Total Tasks</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {uniqueMembers.map((member) => (
+                                    <div key={member._id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium overflow-hidden flex-shrink-0">
+                                            {member.profilePic ? (
+                                                <img src={member.profilePic} alt={member.fullName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                member.fullName?.charAt(0).toUpperCase()
+                                            )}
                                         </div>
-                                        <span className="font-semibold text-slate-800 dark:text-white">{taskStats.total}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
-                                                <ClockIcon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                                            </div>
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">Pending</span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{member.fullName}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.email}</p>
                                         </div>
-                                        <span className="font-semibold text-amber-600 dark:text-amber-400">{taskStats.pending}</span>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">
-                                                <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                            </div>
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">Completed</span>
-                                        </div>
-                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">{taskStats.completed}</span>
+                                ))}
+                                {uniqueMembers.length === 0 && (
+                                    <div className="col-span-full text-center py-8 text-slate-500 dark:text-slate-400">
+                                        <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                        <p>No team members found</p>
                                     </div>
-                                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-red-50 dark:bg-red-500/10 rounded-lg">
-                                                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                            </div>
-                                            <span className="text-sm text-slate-600 dark:text-slate-300">Overdue</span>
-                                        </div>
-                                        <span className="font-semibold text-red-600 dark:text-red-400">{taskStats.overdue || 0}</span>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Recent Tasks Table */}
+                        {/* All Tasks Progress Table */}
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
                             <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
-                                <h3 className="font-semibold text-slate-800 dark:text-white">Recent Tasks</h3>
+                                <h3 className="font-semibold text-slate-800 dark:text-white">All Tasks Progress</h3>
                                 <span className="text-sm text-slate-500 dark:text-slate-400">
-                                    Showing {recentTasks.length} of {taskStats.total} tasks
+                                    Total: {tasks.length} tasks
                                 </span>
                             </div>
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                                 <table className="w-full">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                                         <tr>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Task</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Assigned To</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Priority</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Progress</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Due Date</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                        {recentTasks.length > 0 ? (
-                                            recentTasks.map((task) => (
+                                        {tasks.length > 0 ? (
+                                            tasks.map((task) => (
                                                 <tr key={task._id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                     <td className="px-6 py-4">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-slate-800 dark:text-white">
-                                                                {task.title}
-                                                            </p>
-                                                            {task.description && (
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs">
-                                                                    {task.description}
-                                                                </p>
+                                                        <p className="text-sm font-medium text-slate-800 dark:text-white">
+                                                            {task.title}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex -space-x-2">
+                                                            {task.assignedTo?.map(user => (
+                                                                <div key={user._id} className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] border-2 border-white dark:border-slate-900 overflow-hidden">
+                                                                    {user.profilePic ? (
+                                                                        <img src={user.profilePic} alt={user.fullName} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        user.fullName?.charAt(0).toUpperCase()
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            {(!task.assignedTo || task.assignedTo.length === 0) && (
+                                                                <span className="text-xs text-slate-400">Unassigned</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -412,7 +363,7 @@ const Analytics = () => {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="flex items-center gap-2">
-                                                            <div className="w-16 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                                                            <div className="w-24 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
                                                                 <div 
                                                                     className="bg-indigo-600 h-1.5 rounded-full"
                                                                     style={{ width: `${task.progress || 0}%` }}
@@ -422,9 +373,6 @@ const Analytics = () => {
                                                                 {task.progress || 0}%
                                                             </span>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
-                                                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No date'}
                                                     </td>
                                                 </tr>
                                             ))

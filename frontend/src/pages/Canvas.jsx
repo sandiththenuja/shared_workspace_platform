@@ -1,63 +1,79 @@
-// components/Canvas.jsx - Fully functional tools & coordinate tracking
+// components/Canvas.jsx - Fixed ID comparisons for displaying members
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'; 
+import axios from 'axios';
 import { 
     Pencil, Square, Circle, Type, Eraser, 
-    Undo2, Redo2, Download, Trash2, Save,
-    X, Loader2, Users,
-    Minus, Plus as PlusIcon
+    Undo2, Redo2, Download, Trash2, Save, Minus, PlusIcon,
+    X, Loader2, Users, UserPlus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// ============ MOCK DATA ============
-const MOCK_CANVAS_DATA = {
-    _id: 'mock-canvas-1',
-    name: 'My Canvas',
-    description: 'This is a mock canvas for demonstration',
-    createdBy: { fullName: 'Demo User' },
-    collaborators: [
-        { user: { _id: 'user1', fullName: 'Collaborator 1' }, role: 'editor' },
-        { user: { _id: 'user2', fullName: 'Collaborator 2' }, role: 'viewer' }
-    ],
-    drawingData: {
-        shapes: [
-            { type: 'line', startX: 100, startY: 200, endX: 300, endY: 400, color: '#ff0000', width: 4 },
-            { type: 'shape', shapeType: 'rectangle', x: 500, y: 200, width: 150, height: 100, color: '#00ff00', width: 3 },
-            { type: 'shape', shapeType: 'circle', x: 700, y: 400, radius: 50, color: '#ff00ff', width: 3 },
-            { type: 'text', x: 200, y: 500, text: 'Hello World!', fontSize: 24, color: '#000000' }
-        ]
-    },
-    updatedAt: new Date().toISOString()
-};
 
 const Canvas = ({ canvasId, teamId, onClose }) => {
     // State
     const [tool, setTool] = useState('pen');
     const [color, setColor] = useState('#000000');
     const [strokeWidth, setStrokeWidth] = useState(2);
-    const [drawingData, setDrawingData] = useState([]); // Committed shapes
+    const [drawingData, setDrawingData] = useState([]); 
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const [isDrawing, setIsDrawing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [collaborators, setCollaborators] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]);
     const [canvasInfo, setCanvasInfo] = useState(null);
     const [showCollaborators, setShowCollaborators] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [loadingMessage, setLoadingMessage] = useState('Initializing canvas...');
     
+    // New state for Add Collaborator form
+    const [selectedUserId, setSelectedUserId] = useState('');
+    const [collabRole, setCollabRole] = useState('viewer');
+    const [addingCollab, setAddingCollab] = useState(false);
+    
     // Refs
     const canvasRef = useRef(null);
     const ctxRef = useRef(null);
     const lastPointRef = useRef(null);
-    const startPointRef = useRef(null); // For shapes (rect/circle)
-    
-    // Array to insert coordinates when drawing
+    const startPointRef = useRef(null); 
     const coordinatesArrayRef = useRef([]);
-    const [coordinatesCount, setCoordinatesCount] = useState(0); // To trigger UI updates if needed
-
-    // Initialize canvas on mount
+    const saveTimeoutRef = useRef(null);
+    
+    // ============ LOAD FROM BACKEND ============
     useEffect(() => {
+        const loadCanvas = async () => {
+            if (!canvasId) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                setLoadingMessage('Loading canvas from server...');
+                const { data } = await axios.get(`/api/canvases/${canvasId}`);
+
+                if (data.success && data.canvas) {
+                    setCanvasInfo(data.canvas);
+                    setTeamMembers(data.teamMembers || []);
+                    
+                    const loadedShapes = data.canvas.drawingData || [];
+                    setDrawingData(loadedShapes);
+                    setHistory([loadedShapes]);
+                    setHistoryIndex(0);
+                    
+                    setTimeout(() => redrawCanvas(loadedShapes), 100);
+                    toast.success('Canvas loaded successfully');
+                } else {
+                    throw new Error(data.message || 'Failed to load canvas');
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                toast.error(error.response?.data?.message || 'Failed to load canvas');
+                setHistory([[]]);
+                setHistoryIndex(0);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         const canvasElement = canvasRef.current;
         if (!canvasElement) return;
 
@@ -65,34 +81,86 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         if (!ctx) return;
         
         ctxRef.current = ctx;
-        
         canvasElement.width = 1200;
         canvasElement.height = 800;
-        
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvasElement.width, canvasElement.height);
-        
-        setLoadingMessage('Canvas ready!');
-        
-        setCanvasInfo(MOCK_CANVAS_DATA);
-        const shapes = MOCK_CANVAS_DATA.drawingData?.shapes || [];
-        setDrawingData(shapes);
-        setCollaborators(MOCK_CANVAS_DATA.collaborators || []);
-        
-        setHistory([shapes]);
-        setHistoryIndex(0);
-        
-        redrawCanvas(shapes);
-        
-        toast.success('Canvas loaded (mock)');
-        setIsLoading(false);
-    }, []);
 
-    // Drawing helper functions
+        loadCanvas();
+    }, [canvasId]);
+
+    // ============ AUTO-SAVE TO BACKEND AFTER 5 SEC ============
+    useEffect(() => {
+        if (isLoading || historyIndex <= 0) return;
+
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+            saveToBackend();
+        }, 5000);
+
+        return () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        };
+    }, [drawingData, isLoading, historyIndex]);
+
+    const saveToBackend = async () => {
+        if (!canvasId) return;
+        try {
+            const { data } = await axios.put(`/api/canvases/${canvasId}`, {
+                drawingData: drawingData
+            });
+            
+            if (data.success) {
+                toast.success('Auto-saved', { duration: 2000 });
+                setCanvasInfo(prev => ({ ...prev, updatedAt: new Date().toISOString() }));
+            }
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+            toast.error('Auto-save failed');
+        }
+    };
+
+    // ============ ADD COLLABORATOR METHOD ============
+    const handleAddCollaborator = async () => {
+        if (!selectedUserId) {
+            toast.error('Please select a team member to add');
+            return;
+        }
+
+        const selectedMember = teamMembers.find(m => m._id === selectedUserId);
+        if (!selectedMember) {
+            toast.error('Team member not found');
+            return;
+        }
+
+        setAddingCollab(true);
+        try {
+            const { data } = await axios.post(`/api/canvases/${canvasId}/collaborators`, {
+                email: selectedMember.email,
+                role: collabRole
+            });
+
+            if (data.success) {
+                setCanvasInfo(data.canvas);
+                setSelectedUserId('');
+                toast.success(`${selectedMember.fullName} added as ${collabRole}`);
+            }
+        } catch (error) {
+            console.error('Add collaborator error:', error);
+            toast.error(error.response?.data?.message || 'Failed to add collaborator');
+        } finally {
+            setAddingCollab(false);
+        }
+    };
+
+    // ============ DRAWING LOGIC ============
     const drawLine = (ctx, item) => {
         ctx.beginPath();
         ctx.strokeStyle = item.color || '#000000';
-        ctx.lineWidth = item.width || 2;
+        ctx.lineWidth = item.strokeWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.moveTo(item.startX || 0, item.startY || 0);
@@ -103,12 +171,14 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
     const drawShape = (ctx, item) => {
         ctx.beginPath();
         ctx.strokeStyle = item.color || '#000000';
-        ctx.lineWidth = item.width || 2;
+        ctx.lineWidth = item.strokeWidth || 2; 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
         if (item.shapeType === 'rectangle') {
-            ctx.rect(item.x || 0, item.y || 0, item.width || 50, item.height || 50);
+            const w = item.width || 0;
+            const h = item.height || 0;
+            ctx.rect(item.x || 0, item.y || 0, w, h);
         } else if (item.shapeType === 'circle') {
             ctx.arc(item.x || 0, item.y || 0, Math.max(0, item.radius || 25), 0, 2 * Math.PI);
         }
@@ -125,7 +195,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         if (!item.points || item.points.length === 0) return;
         ctx.beginPath();
         ctx.strokeStyle = item.color;
-        ctx.lineWidth = item.width;
+        ctx.lineWidth = item.strokeWidth || 2; 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
@@ -136,7 +206,6 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         ctx.stroke();
     };
 
-    // Redraw canvas from data array
     const redrawCanvas = useCallback((data) => {
         const canvasEl = canvasRef.current;
         const ctx = ctxRef.current;
@@ -158,7 +227,6 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         ctx.restore();
     }, []);
 
-    // Get mouse coordinates adjusted for canvas scaling
     const getMouseCoords = (e) => {
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = canvasRef.current.width / rect.width;
@@ -169,7 +237,6 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         };
     };
 
-    // ============ DRAWING FUNCTIONS ============
     const startDrawing = (e) => {
         if (!canvasRef.current) return;
         const { x, y } = getMouseCoords(e);
@@ -178,10 +245,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         startPointRef.current = { x, y };
         lastPointRef.current = { x, y };
         
-        // Reset coordinate array for the new shape
         coordinatesArrayRef.current = [{ x, y }];
-        setCoordinatesCount(1);
-        console.log('🟢 Start Drawing - Coordinates Array:', coordinatesArrayRef.current);
 
         if (tool === 'text') {
             const text = prompt('Enter text:');
@@ -205,13 +269,9 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         const ctx = ctxRef.current;
         if (!ctx) return;
 
-        // Insert coordinates into array and display in console
         coordinatesArrayRef.current.push({ x, y });
-        setCoordinatesCount(coordinatesArrayRef.current.length);
-        console.log('✏️ Drawing - Coordinates Array Updated:', coordinatesArrayRef.current);
 
         if (tool === 'pen' || tool === 'eraser') {
-            // Draw line segment directly on canvas for smooth performance
             ctx.beginPath();
             ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
             ctx.lineWidth = tool === 'eraser' ? 20 : strokeWidth;
@@ -224,20 +284,24 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             lastPointRef.current = { x, y };
         } 
         else if (tool === 'rectangle' || tool === 'circle') {
-            // For shapes, redraw the base canvas, then draw the preview shape
             redrawCanvas(drawingData);
             
             ctx.beginPath();
             ctx.strokeStyle = color;
             ctx.lineWidth = strokeWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            const startX = startPointRef.current.x;
+            const startY = startPointRef.current.y;
             
             if (tool === 'rectangle') {
-                const width = x - startPointRef.current.x;
-                const height = y - startPointRef.current.y;
-                ctx.rect(startPointRef.current.x, startPointRef.current.y, width, height);
+                const width = x - startX;
+                const height = y - startY;
+                ctx.rect(startX, startY, width, height);
             } else if (tool === 'circle') {
-                const radius = Math.sqrt(Math.pow(x - startPointRef.current.x, 2) + Math.pow(y - startPointRef.current.y, 2));
-                ctx.arc(startPointRef.current.x, startPointRef.current.y, Math.max(0, radius), 0, 2 * Math.PI);
+                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                ctx.arc(startX, startY, Math.max(0, radius), 0, 2 * Math.PI);
             }
             ctx.stroke();
         }
@@ -253,9 +317,9 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
             if (coordinatesArrayRef.current.length > 1) {
                 newShape = {
                     type: 'path',
-                    points: [...coordinatesArrayRef.current], // Save all collected coordinates
+                    points: [...coordinatesArrayRef.current],
                     color: tool === 'eraser' ? '#ffffff' : color,
-                    width: tool === 'eraser' ? 20 : strokeWidth,
+                    strokeWidth: tool === 'eraser' ? 20 : strokeWidth,
                     isEraser: tool === 'eraser'
                 };
             }
@@ -271,7 +335,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                 width: end.x - start.x,
                 height: end.y - start.y,
                 color: color,
-                width: strokeWidth
+                strokeWidth: strokeWidth 
             };
         } 
         else if (tool === 'circle') {
@@ -285,23 +349,19 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                 y: start.y,
                 radius: Math.max(0, radius),
                 color: color,
-                width: strokeWidth
+                strokeWidth: strokeWidth 
             };
         }
 
-        // Commit shape to main drawing array
         if (newShape) {
             const updatedData = [...drawingData, newShape];
             setDrawingData(updatedData);
             setHistory(prev => [...prev.slice(0, historyIndex + 1), updatedData]);
             setHistoryIndex(prev => prev + 1);
-            redrawCanvas(updatedData); // Final clean redraw
+            redrawCanvas(updatedData); 
         }
 
-        // Clear coordinate array for the next shape
-        console.log(`🔴 Stopped Drawing. Total Coordinates Captured: ${coordinatesArrayRef.current.length}`);
         coordinatesArrayRef.current = [];
-        setCoordinatesCount(0);
     };
 
     // ============ HISTORY ACTIONS ============
@@ -334,18 +394,9 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         toast.success('Canvas cleared');
     };
 
-    // ============ EXPORT / SAVE ============
+    // ============ MANUAL SAVE / EXPORT ============
     const saveDrawing = async () => {
-        try {
-            toast.loading('Saving...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            toast.dismiss();
-            toast.success('Drawing saved (mock)');
-            setCanvasInfo(prev => ({ ...prev, updatedAt: new Date().toISOString() }));
-        } catch (error) {
-            toast.dismiss();
-            toast.error('Failed to save drawing');
-        }
+        await saveToBackend();
     };
 
     const exportImage = () => {
@@ -362,10 +413,16 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         }
     };
 
-    // Zoom helpers
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
     const resetZoom = () => setZoom(1);
+
+    // Fixed: Use toString() for comparing IDs
+    const availableMembers = teamMembers.filter(member => {
+        const isCollaborator = canvasInfo?.collaborators?.some(c => c.user._id.toString() === member._id.toString());
+        const isOwner = canvasInfo?.createdBy?._id?.toString() === member._id.toString();
+        return !isCollaborator && !isOwner;
+    });
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex flex-col h-full relative">
@@ -396,9 +453,9 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     <button onClick={saveDrawing} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-green-600" title="Save"><Save className="w-5 h-5" /></button>
                     <button onClick={exportImage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Export"><Download className="w-5 h-5" /></button>
                     <button onClick={clearCanvas} className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-red-500" title="Clear"><Trash2 className="w-5 h-5" /></button>
-                    <button onClick={() => setShowCollaborators(!showCollaborators)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative" title="Collaborators">
+                    <button onClick={() => setShowCollaborators(!showCollaborators)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative" title="Team & Collaborators">
                         <Users className="w-5 h-5" />
-                        {collaborators.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center">{collaborators.length}</span>}
+                        {canvasInfo?.collaborators?.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center">{canvasInfo.collaborators.length}</span>}
                     </button>
                     <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
@@ -425,26 +482,114 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                         onMouseLeave={stopDrawing}
                     />
                 </div>
-            </div>
 
-            {/* Collaborators Panel */}
-            {showCollaborators && (
-                <div className="absolute top-16 right-4 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-4 w-64 z-10">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-slate-800 dark:text-white">Collaborators</h4>
-                        <button onClick={() => setShowCollaborators(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"><X className="w-4 h-4" /></button>
-                    </div>
-                    <div className="space-y-2">
-                        {collaborators.map((collab) => (
-                            <div key={collab.user._id} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium">{collab.user.fullName?.charAt(0)}</div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-slate-800 dark:text-white">{collab.user.fullName}</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{collab.role}</p>
+                {/* Floating Team Members Avatar Stack (Right Side) */}
+                <div className="absolute top-6 right-6 flex flex-col items-center gap-2 z-20">
+                    {teamMembers.map((member) => {
+                        // Fixed: Use toString() for comparing IDs
+                        const collab = canvasInfo?.collaborators?.find(c => c.user._id.toString() === member._id.toString());
+                        const isOwner = canvasInfo?.createdBy?._id?.toString() === member._id.toString();
+                        
+                        return (
+                            <div key={member._id} className="group relative">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium overflow-hidden border-2 border-white dark:border-slate-800 shadow-md cursor-pointer transition-transform hover:scale-110">
+                                    {member.profilePic ? (
+                                        <img src={member.profilePic} alt={member.fullName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        member.fullName?.charAt(0).toUpperCase()
+                                    )}
+                                </div>
+                                
+                                {/* Hover Tooltip */}
+                                <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded-md shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">
+                                    <p className="font-semibold">{member.fullName}</p>
+                                    <p className="text-slate-300">{member.email}</p>
+                                    {isOwner && <span className="block text-indigo-400 mt-1">Owner</span>}
+                                    {collab && !isOwner && <span className="block text-emerald-400 mt-1 capitalize">{collab.role}</span>}
                                 </div>
                             </div>
-                        ))}
-                        {collaborators.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">No collaborators yet</p>}
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Collaborators & Team Management Panel */}
+            {showCollaborators && (
+                <div className="absolute top-16 right-4 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-4 w-80 z-30 flex flex-col gap-4 max-h-[85vh]">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h4 className="font-semibold text-slate-800 dark:text-white">Team Roster</h4>
+                        <button onClick={() => setShowCollaborators(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"><X className="w-4 h-4" /></button>
+                    </div>
+
+                    {/* Add Collaborator Form */}
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-2 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <UserPlus className="w-4 h-4" />
+                            Add Collaborator
+                        </div>
+                        
+                        {availableMembers.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                                <select 
+                                    value={selectedUserId} 
+                                    onChange={(e) => setSelectedUserId(e.target.value)}
+                                    className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="">Select team member...</option>
+                                    {availableMembers.map(member => (
+                                        <option key={member._id} value={member._id}>{member.fullName} ({member.email})</option>
+                                    ))}
+                                </select>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={handleAddCollaborator} 
+                                        disabled={addingCollab || !selectedUserId}
+                                        className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                                    >
+                                        {addingCollab ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-1">All team members are already collaborators.</p>
+                        )}
+                    </div>
+
+                    {/* Unified Team & Collaborators List */}
+                    <div className="flex-1 overflow-y-auto -mx-1 px-1">
+                        <div className="space-y-2">
+                            {teamMembers.map((member) => {
+                                // Fixed: Use toString() for comparing IDs
+                                const collab = canvasInfo?.collaborators?.find(c => c.user._id.toString() === member._id.toString());
+                                const isOwner = canvasInfo?.createdBy?._id?.toString() === member._id.toString();
+                                const roleLabel = isOwner ? 'Owner' : collab ? collab.role : 'Member';
+
+                                return (
+                                    <div key={member._id} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium overflow-hidden flex-shrink-0">
+                                            {member.profilePic ? (
+                                                <img src={member.profilePic} alt={member.fullName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                member.fullName?.charAt(0)
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{member.fullName}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.email}</p>
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded-full capitalize flex-shrink-0 ${
+                                            roleLabel === 'Owner' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300' :
+                                            roleLabel === 'editor' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300' :
+                                            roleLabel === 'viewer' ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300' :
+                                            'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                        }`}>
+                                            {roleLabel}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                            {teamMembers.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">No team members found</p>}
+                        </div>
                     </div>
                 </div>
             )}
@@ -458,8 +603,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     <span className="text-green-500">● Ready</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <span>Live Coords Tracked: {coordinatesCount}</span>
-                    <span>Saved Shapes: {drawingData.length}</span>
+                    <span>Shapes: {drawingData.length}</span>
                     <span>Zoom: {Math.round(zoom * 100)}%</span>
                     <span>Last saved: {canvasInfo?.updatedAt ? new Date(canvasInfo.updatedAt).toLocaleTimeString() : 'Never'}</span>
                 </div>

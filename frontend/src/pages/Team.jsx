@@ -11,7 +11,8 @@ import {
     User, AtSign, Send, FileText, Download as DownloadIcon,
     Edit2, Save, RefreshCw, File, Folder,
     Globe,
-    Lock
+    Lock,
+    ListTodo
 } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import { useTeam } from '../context/TeamContext';
@@ -51,6 +52,14 @@ const Team = () => {
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [allUsers, setAllUsers] = useState([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
+
+    // Task Modal State
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [editingTask, setEditingTask] = useState(null);
+    const [taskForm, setTaskForm] = useState({
+        title: '', description: '', priority: 'Medium', status: 'Pending', 
+        dueDate: '', teamId: '', assignedTo: [], progress: 0
+    });
 
     // Edit Team Modal State
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
@@ -127,7 +136,10 @@ const handleFileDeleted = (fileId) => {
     } = useTeam();
     
     const { authUser, token } = useAuth();
-    const { getTasks } = useTask();
+    const { tasks, getTasks } = useTask();
+
+    // Add this line right below your other useEffect hooks to ensure tasks are loaded
+    const teamTasks = tasks.filter(task => (task.teamId?._id || task.teamId) === selectedTeamId);
 
     // Check if user is authenticated
     useEffect(() => {
@@ -825,6 +837,71 @@ const handleFileDeleted = (fileId) => {
         return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
     };
 
+    // ============ TASK CRUD HANDLERS ============
+    const openCreateTaskModal = () => {
+        setEditingTask(null);
+        setTaskForm({
+            title: '', description: '', priority: 'Medium', status: 'Pending', 
+            dueDate: '', teamId: selectedTeamId, assignedTo: [], progress: 0
+        });
+        setIsTaskModalOpen(true);
+    };
+
+    const openEditTaskModal = (task) => {
+        setEditingTask(task);
+        setTaskForm({
+            title: task.title || '',
+            description: task.description || '',
+            priority: task.priority || 'Medium',
+            status: task.status || 'Pending',
+            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+            teamId: task.teamId?._id || task.teamId || selectedTeamId,
+            assignedTo: task.assignedTo?.map(u => u._id) || [],
+            progress: task.progress || 0
+        });
+        setIsTaskModalOpen(true);
+    };
+
+    const handleTaskSubmit = async (e) => {
+        e.preventDefault();
+        if (!taskForm.title.trim()) return toast.error('Task title is required');
+        
+        try {
+            if (editingTask) {
+                await axios.put(`/api/tasks/${editingTask._id}`, taskForm);
+                toast.success('Task updated successfully');
+            } else {
+                await axios.post('/api/tasks', taskForm);
+                toast.success('Task created successfully');
+            }
+            await getTasks();
+            setIsTaskModalOpen(false);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to save task');
+        }
+    };
+
+    const handleDeleteTask = async (taskId) => {
+        if (!window.confirm('Are you sure you want to delete this task?')) return;
+        try {
+            await axios.delete(`/api/tasks/${taskId}`);
+            await getTasks();
+            toast.success('Task deleted');
+        } catch (error) {
+            toast.error('Failed to delete task');
+        }
+    };
+
+    const handleProgressChange = async (taskId, newProgress) => {
+        try {
+            const status = newProgress === 100 ? 'Completed' : newProgress > 0 ? 'In Progress' : 'Pending';
+            await axios.put(`/api/tasks/${taskId}/status`, { progress: newProgress, status });
+            await getTasks();
+        } catch (error) {
+            toast.error('Failed to update progress');
+        }
+    };
+
     // Loading state
     if (teamLoading && teams.length === 0) {
         return (
@@ -1421,7 +1498,65 @@ const handleFileDeleted = (fileId) => {
                     </>
                 )}
 
-                // pages/Team.jsx - Add null checks around selectedTeam usage
+                {/* // pages/Team.jsx - Add null checks around selectedTeam usage */}
+
+                {selectedTeam && ( <> 
+                {/* Team Tasks Section */}
+<div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+    <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+        <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+            <ListTodo className="w-5 h-5 text-indigo-500" /> Team Tasks ({teamTasks.length})
+        </h3>
+        {isTeamAdmin() && (
+            <button onClick={openCreateTaskModal} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-1">
+                <Plus className="w-4 h-4" /> Add Task
+            </button>
+        )}
+    </div>
+    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        {teamTasks.length > 0 ? (
+            teamTasks.map(task => (
+                <div key={task._id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                        <div>
+                            <p className="font-medium text-slate-800 dark:text-white">{task.title}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Assigned to: {task.assignedTo?.map(u => u.fullName).join(', ') || 'Unassigned'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                                task.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : 
+                                task.status === 'In Progress' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
+                            }`}>{task.status}</span>
+                            {isTeamAdmin() && (
+                                <>
+                                    <button onClick={() => openEditTaskModal(task)} className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"><Pencil className="w-4 h-4" /></button>
+                                    <button onClick={() => handleDeleteTask(task._id)} className="p-1 text-red-600 hover:bg-red-100 rounded"><Trash2 className="w-4 h-4" /></button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-3">
+                        <span className="text-xs text-slate-500 min-w-[60px]">Progress:</span>
+                        <input 
+                            type="range" min="0" max="100" value={task.progress || 0}
+                            onChange={(e) => handleProgressChange(task._id, parseInt(e.target.value))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[40px] text-right">{task.progress || 0}%</span>
+                    </div>
+                </div>
+            ))
+        ) : (
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <ListTodo className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <p>No tasks for this team yet.</p>
+            </div>
+        )}
+    </div>
+</div>
+                 </> )}
 
 {/* Team Files Section - Add this with proper null check */}
 {selectedTeam && selectedTeam._id && (
@@ -1925,6 +2060,102 @@ const handleFileDeleted = (fileId) => {
                     onCreateTeam={handleCreateTeam}
                     isCreating={isCreating}
                 />
+
+                {/* Team Tasks Section */}
+{/* Create/Edit Task Modal */}
+{isTaskModalOpen && (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+                    {editingTask ? 'Edit Task' : 'Create New Task'}
+                </h3>
+                <button onClick={() => setIsTaskModalOpen(false)} className="p-1 hover:bg-slate-100 rounded">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+            <form onSubmit={handleTaskSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Title <span className="text-red-500">*</span></label>
+                    <input 
+                        type="text" required value={taskForm.title} 
+                        onChange={(e) => setTaskForm({...taskForm, title: e.target.value})} 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                    <textarea 
+                        rows={3} value={taskForm.description} 
+                        onChange={(e) => setTaskForm({...taskForm, description: e.target.value})} 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
+                        <select 
+                            value={taskForm.priority} 
+                            onChange={(e) => setTaskForm({...taskForm, priority: e.target.value})} 
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option>Low</option><option>Medium</option><option>High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                        <select 
+                            value={taskForm.status} 
+                            onChange={(e) => setTaskForm({...taskForm, status: e.target.value})} 
+                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option>Pending</option><option>In Progress</option><option>Completed</option>
+                        </select>
+                    </div>
+                </div>
+                {editingTask && (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Progress: {taskForm.progress}%</label>
+                        <input 
+                            type="range" min="0" max="100" value={taskForm.progress} 
+                            onChange={(e) => setTaskForm({...taskForm, progress: parseInt(e.target.value)})} 
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                    </div>
+                )}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
+                    <input 
+                        type="date" value={taskForm.dueDate} 
+                        onChange={(e) => setTaskForm({...taskForm, dueDate: e.target.value})} 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Assign Members</label>
+                    <select 
+                        multiple value={taskForm.assignedTo} 
+                        onChange={(e) => setTaskForm({...taskForm, assignedTo: Array.from(e.target.selectedOptions, option => option.value)})} 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24"
+                    >
+                        {selectedTeam?.members?.map(member => (
+                            <option key={member._id} value={member._id}>{member.fullName}</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple members.</p>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                    <button type="button" onClick={() => setIsTaskModalOpen(false)} className="flex-1 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">
+                        Cancel
+                    </button>
+                    <button type="submit" className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg">
+                        {editingTask ? 'Update Task' : 'Create Task'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+)}
             </div>
         </DashboardLayout>
     );

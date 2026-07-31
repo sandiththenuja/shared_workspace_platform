@@ -1,4 +1,3 @@
-// pages/Dashboard.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../layout/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
@@ -23,15 +22,39 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
-    const [taskData, setTaskData] = useState([]);
-    const [statusData, setStatusData] = useState([]);
-    const [priorityData, setPriorityData] = useState([]);
-    const [weeklyData, setWeeklyData] = useState([]);
-    const [performanceData, setPerformanceData] = useState([]);
+    
+    // Initialize with default empty data to ensure charts render immediately
+    const [statusData, setStatusData] = useState([
+        { name: 'Pending', value: 0 },
+        { name: 'In Progress', value: 0 },
+        { name: 'Completed', value: 0 }
+    ]);
+    const [priorityData, setPriorityData] = useState([
+        { name: 'High', value: 0 },
+        { name: 'Medium', value: 0 },
+        { name: 'Low', value: 0 }
+    ]);
+    const [weeklyData] = useState([
+        { day: 'Mon', tasks: 12, completed: 8 },
+        { day: 'Tue', tasks: 15, completed: 10 },
+        { day: 'Wed', tasks: 8, completed: 5 },
+        { day: 'Thu', tasks: 20, completed: 15 },
+        { day: 'Fri', tasks: 18, completed: 12 },
+        { day: 'Sat', tasks: 6, completed: 4 },
+        { day: 'Sun', tasks: 4, completed: 3 }
+    ]);
+    const [performanceData] = useState([
+        { subject: 'Productivity', A: 85, fullMark: 100 },
+        { subject: 'Quality', A: 90, fullMark: 100 },
+        { subject: 'Speed', A: 75, fullMark: 100 },
+        { subject: 'Collaboration', A: 88, fullMark: 100 },
+        { subject: 'Innovation', A: 70, fullMark: 100 },
+        { subject: 'Reliability', A: 92, fullMark: 100 }
+    ]);
     const [animated, setAnimated] = useState(false);
 
     const { authUser } = useAuth();
-    const { tasks, getTasks, statusSummary, getTaskStatistics, loading: taskLoading } = useTask();
+    const { tasks, getTasks, getTaskStatistics, loading: taskLoading } = useTask();
     const { teams, fetchTeams, loading: teamLoading } = useTeam();
 
     const chartRef = useRef(null);
@@ -49,110 +72,61 @@ const Dashboard = () => {
         'Low': '#3b82f6'
     };
 
+    // 1. Fetch data on mount
     useEffect(() => {
-        fetchDashboardData();
-        // Trigger animation after mount
+        const loadData = async () => {
+            try {
+                await Promise.all([getTasks(), fetchTeams()]);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
         setTimeout(() => setAnimated(true), 300);
     }, []);
 
-    const fetchDashboardData = async () => {
-        setLoading(true);
-        try {
-            await Promise.all([getTasks(), fetchTeams()]);
-            
-            // Get task statistics
-            const taskStats = getTaskStatistics(tasks);
-            
-            // Update stats
-            setStats([
-                { 
-                    icon: ListTodo, 
-                    label: 'Total Tasks', 
-                    value: taskStats.total.toString(), 
-                    change: '+12.5%', 
-                    positive: true,
-                    color: 'indigo'
-                },
-                { 
-                    icon: CheckCircle, 
-                    label: 'Completed', 
-                    value: taskStats.completed.toString(), 
-                    change: '+8.2%', 
-                    positive: true,
-                    color: 'emerald'
-                },
-                { 
-                    icon: Users, 
-                    label: 'Team Members', 
-                    value: teams.reduce((acc, team) => acc + (team.members?.length || 0), 0).toString(),
-                    change: '+3.1%', 
-                    positive: true,
-                    color: 'purple'
-                },
-                { 
-                    icon: MessageSquare, 
-                    label: 'Messages', 
-                    value: '1,293', 
-                    change: '-2.4%', 
-                    positive: false,
-                    color: 'orange'
-                },
-            ]);
+    // 2. Calculate stats safely when `tasks` array actually updates in context
+    useEffect(() => {
+        if (!tasks || tasks.length === 0) return;
 
-            // Task status data for pie chart
-            setStatusData([
-                { name: 'Pending', value: taskStats.pending },
-                { name: 'In Progress', value: taskStats.inProgress },
-                { name: 'Completed', value: taskStats.completed }
-            ]);
+        const taskStats = getTaskStatistics(tasks) || {};
 
-            // Priority data
-            setPriorityData([
-                { name: 'High', value: taskStats.priorityBreakdown?.high || 0 },
-                { name: 'Medium', value: taskStats.priorityBreakdown?.medium || 0 },
-                { name: 'Low', value: taskStats.priorityBreakdown?.low || 0 }
-            ]);
+        // Update stats cards
+        setStats([
+            { icon: ListTodo, label: 'Total Tasks', value: taskStats.total?.toString() || '0', change: '+12.5%', positive: true, color: 'indigo' },
+            { icon: CheckCircle, label: 'Completed', value: taskStats.completed?.toString() || '0', change: '+8.2%', positive: true, color: 'emerald' },
+            { icon: Users, label: 'Team Members', value: teams.reduce((acc, team) => acc + (team.members?.length || 0), 0).toString(), change: '+3.1%', positive: true, color: 'purple' },
+            { icon: MessageSquare, label: 'Messages', value: '1,293', change: '-2.4%', positive: false, color: 'orange' },
+        ]);
 
-            // Weekly task data
-            setWeeklyData([
-                { day: 'Mon', tasks: 12, completed: 8 },
-                { day: 'Tue', tasks: 15, completed: 10 },
-                { day: 'Wed', tasks: 8, completed: 5 },
-                { day: 'Thu', tasks: 20, completed: 15 },
-                { day: 'Fri', tasks: 18, completed: 12 },
-                { day: 'Sat', tasks: 6, completed: 4 },
-                { day: 'Sun', tasks: 4, completed: 3 }
-            ]);
+        // Update chart data
+        setStatusData([
+            { name: 'Pending', value: taskStats.pending || 0 },
+            { name: 'In Progress', value: taskStats.inProgress || 0 },
+            { name: 'Completed', value: taskStats.completed || 0 }
+        ]);
 
-            // Performance data for radar chart
-            setPerformanceData([
-                { subject: 'Productivity', A: 85, fullMark: 100 },
-                { subject: 'Quality', A: 90, fullMark: 100 },
-                { subject: 'Speed', A: 75, fullMark: 100 },
-                { subject: 'Collaboration', A: 88, fullMark: 100 },
-                { subject: 'Innovation', A: 70, fullMark: 100 },
-                { subject: 'Reliability', A: 92, fullMark: 100 }
-            ]);
+        setPriorityData([
+            { name: 'High', value: taskStats.priorityBreakdown?.high || 0 },
+            { name: 'Medium', value: taskStats.priorityBreakdown?.medium || 0 },
+            { name: 'Low', value: taskStats.priorityBreakdown?.low || 0 }
+        ]);
 
-            // Recent activity (from actual tasks)
-            const recent = tasks.slice(0, 5).map(task => ({
-                user: task.createdBy?.fullName || 'System',
-                action: `created a new task: "${task.title}"`,
-                time: new Date(task.createdAt).toLocaleDateString(),
-                project: task.title
-            }));
-            setRecentActivity(recent);
+        // Update recent activity
+        const recent = tasks.slice(0, 5).map(task => ({
+            user: task.createdBy?.fullName || 'System',
+            action: `created a new task: "${task.title}"`,
+            time: new Date(task.createdAt).toLocaleDateString(),
+            project: task.title
+        }));
+        setRecentActivity(recent);
 
-        } catch (error) {
-            console.error('Error fetching dashboard data:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [tasks, teams, getTaskStatistics]);
 
     const isAdmin = authUser?.role === 'admin';
 
-    // Custom tooltip for charts
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             return (
@@ -209,7 +183,7 @@ const Dashboard = () => {
                     </div>
                     <div className="flex items-center gap-3 mt-4 md:mt-0">
                         <button 
-                            onClick={fetchDashboardData}
+                            onClick={() => { getTasks(); fetchTeams(); }}
                             className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
                         >
                             <Activity className="w-4 h-4" />
