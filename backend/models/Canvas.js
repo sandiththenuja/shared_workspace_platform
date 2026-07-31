@@ -1,4 +1,3 @@
-// models/Canvas.js
 import mongoose from 'mongoose';
 
 const canvasSchema = new mongoose.Schema({
@@ -36,34 +35,10 @@ const canvasSchema = new mongoose.Schema({
             default: Date.now
         }
     }],
+    // Changed to a flexible Array to store all shape types and their exact coordinates
     drawingData: {
-        lines: [{
-            id: String,
-            points: [Number],
-            color: String,
-            width: Number,
-            tool: String
-        }],
-        shapes: [{
-            id: String,
-            x: Number,
-            y: Number,
-            width: Number,
-            height: Number,
-            radius: Number,
-            color: String,
-            strokeWidth: Number,
-            tool: String
-        }],
-        texts: [{
-            id: String,
-            x: Number,
-            y: Number,
-            text: String,
-            fontSize: Number,
-            color: String,
-            tool: String
-        }]
+        type: Array,
+        default: []
     },
     background: {
         type: String,

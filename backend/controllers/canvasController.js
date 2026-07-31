@@ -1,7 +1,6 @@
-// controllers/canvasController.js
 import Canvas from "../models/Canvas.js";
 import Team from "../models/Team.js";
-import User from "../models/User.js"; // <-- ADD THIS IMPORT
+import User from "../models/User.js"; 
 import { io, userSocketMap } from "../server.js";
 
 // ===== HELPER FUNCTIONS =====
@@ -47,8 +46,10 @@ export const createCanvas = async (req, res) => {
             });
         }
 
+        // Any team member can create a canvas
         const isMember = isTeamMember(team, userId);
-        if (!isMember) {
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isMember && !isAdmin) {
             return res.status(403).json({
                 success: false,
                 message: 'You are not a member of this team'
@@ -62,18 +63,19 @@ export const createCanvas = async (req, res) => {
             createdBy: userId,
             isPublic: isPublic || false,
             tags: tags || [],
-            drawingData: { lines: [], shapes: [], texts: [] } // Initialize with empty data
+            drawingData: [] // Initialize with empty array to match new schema
         });
 
         const populatedCanvas = await Canvas.findById(canvas._id)
-            .populate('createdBy', 'fullName email profilePic')
-            .populate('collaborators.user', 'fullName email profilePic');
+            .populate('createdBy', 'name email profilePic')
+            .populate('collaborators.user', 'name email profilePic');
 
         // Notify team members
         if (team.members) {
             team.members.forEach(memberId => {
-                const socketId = userSocketMap[memberId.toString()];
-                if (socketId && memberId.toString() !== userId.toString()) {
+                const mId = memberId._id || memberId;
+                const socketId = userSocketMap[mId.toString()];
+                if (socketId && mId.toString() !== userId.toString()) {
                     io.to(socketId).emit('canvasCreated', {
                         canvas: populatedCanvas,
                         teamId: teamId,
@@ -113,7 +115,8 @@ export const getTeamCanvases = async (req, res) => {
         }
 
         const isMember = isTeamMember(team, userId);
-        if (!isMember) {
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isAdmin && !isMember) {
             return res.status(403).json({
                 success: false,
                 message: 'You are not a member of this team'
@@ -141,6 +144,7 @@ export const getTeamCanvases = async (req, res) => {
 };
 
 // ===== GET CANVAS BY ID =====
+// ===== GET CANVAS BY ID =====
 export const getCanvasById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -151,48 +155,36 @@ export const getCanvasById = async (req, res) => {
             .populate('collaborators.user', 'fullName email profilePic');
 
         if (!canvas) {
-            return res.status(404).json({
-                success: false,
-                message: 'Canvas not found'
-            });
+            return res.status(404).json({ success: false, message: 'Canvas not found' });
         }
 
-        // Ensure drawingData has default structure
         if (!canvas.drawingData) {
-            canvas.drawingData = { lines: [], shapes: [], texts: [] };
+            canvas.drawingData = [];
             await canvas.save();
         }
 
-        const team = await Team.findById(canvas.teamId);
+        // CRITICAL: Populate the team members so we can send them to the frontend
+        const team = await Team.findById(canvas.teamId).populate('members', 'fullName email profilePic');
         if (!team) {
-            return res.status(404).json({
-                success: false,
-                message: 'Team not found'
-            });
+            return res.status(404).json({ success: false, message: 'Team not found' });
         }
 
         const isMember = isTeamMember(team, userId);
-        if (!isMember) {
-            return res.status(403).json({
-                success: false,
-                message: 'You do not have access to this canvas'
-            });
+        const isAdmin = isTeamAdmin(team, userId, req.user);
+        
+        if (!isMember && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'You do not have access to this canvas' });
         }
 
         canvas.lastActive = new Date();
         await canvas.save();
 
-        res.json({
-            success: true,
-            canvas
-        });
+        // CRITICAL: Return teamMembers in the response
+        res.json({ success: true, canvas, teamMembers: team.members });
 
     } catch (error) {
         console.error('Get canvas error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to get canvas'
-        });
+        res.status(500).json({ success: false, message: error.message || 'Failed to get canvas' });
     }
 };
 
@@ -205,22 +197,19 @@ export const updateCanvas = async (req, res) => {
 
         const canvas = await Canvas.findById(id);
         if (!canvas) {
-            return res.status(404).json({
-                success: false,
-                message: 'Canvas not found'
-            });
+            return res.status(404).json({ success: false, message: 'Canvas not found' });
         }
 
-        const isCreator = canvas.createdBy.toString() === userId.toString();
-        const isCollaborator = canvas.collaborators.some(
-            c => c.user.toString() === userId.toString() && c.role === 'editor'
-        );
+        const team = await Team.findById(canvas.teamId);
+        if (!team) {
+            return res.status(404).json({ success: false, message: 'Team not found' });
+        }
 
-        if (!isCreator && !isCollaborator) {
-            return res.status(403).json({
-                success: false,
-                message: 'You do not have permission to edit this canvas'
-            });
+        // CHANGED: Any team member can update the canvas
+        const isMember = isTeamMember(team, userId);
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isMember && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'You do not have permission to edit this canvas' });
         }
 
         const updateData = {};
@@ -237,13 +226,14 @@ export const updateCanvas = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         )
-        .populate('createdBy', 'name email profilePic')
-        .populate('collaborators.user', 'name email profilePic');
+        .populate('createdBy', 'fullName email profilePic')
+        .populate('collaborators.user', 'fullName email profilePic');
 
-        const team = await Team.findById(canvas.teamId);
-        if (team && team.members) {
+        // Notify team members
+        if (team.members) {
             team.members.forEach(memberId => {
-                const socketId = userSocketMap[memberId.toString()];
+                const mId = memberId._id || memberId;
+                const socketId = userSocketMap[mId.toString()];
                 if (socketId) {
                     io.to(socketId).emit('canvasUpdated', {
                         canvasId: id,
@@ -254,18 +244,11 @@ export const updateCanvas = async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            canvas: updatedCanvas,
-            message: 'Canvas updated successfully'
-        });
+        res.json({ success: true, canvas: updatedCanvas, message: 'Canvas updated successfully' });
 
     } catch (error) {
         console.error('Update canvas error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to update canvas'
-        });
+        res.status(500).json({ success: false, message: error.message || 'Failed to update canvas' });
     }
 };
 
@@ -277,25 +260,27 @@ export const deleteCanvas = async (req, res) => {
 
         const canvas = await Canvas.findById(id);
         if (!canvas) {
-            return res.status(404).json({
-                success: false,
-                message: 'Canvas not found'
-            });
-        }
-
-        if (canvas.createdBy.toString() !== userId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the creator can delete this canvas'
-            });
+            return res.status(404).json({ success: false, message: 'Canvas not found' });
         }
 
         const team = await Team.findById(canvas.teamId);
+        if (!team) {
+            return res.status(404).json({ success: false, message: 'Team not found' });
+        }
+
+        // CHANGED: Any team member can delete the canvas
+        const isMember = isTeamMember(team, userId);
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isMember && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'Only team members can delete this canvas' });
+        }
+
         await Canvas.findByIdAndDelete(id);
 
-        if (team && team.members) {
+        if (team.members) {
             team.members.forEach(memberId => {
-                const socketId = userSocketMap[memberId.toString()];
+                const mId = memberId._id || memberId;
+                const socketId = userSocketMap[mId.toString()];
                 if (socketId) {
                     io.to(socketId).emit('canvasDeleted', {
                         canvasId: id,
@@ -306,17 +291,11 @@ export const deleteCanvas = async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            message: 'Canvas deleted successfully'
-        });
+        res.json({ success: true, message: 'Canvas deleted successfully' });
 
     } catch (error) {
         console.error('Delete canvas error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to delete canvas'
-        });
+        res.status(500).json({ success: false, message: error.message || 'Failed to delete canvas' });
     }
 };
 
@@ -329,32 +308,28 @@ export const addCollaborator = async (req, res) => {
 
         const canvas = await Canvas.findById(id);
         if (!canvas) {
-            return res.status(404).json({
-                success: false,
-                message: 'Canvas not found'
-            });
+            return res.status(404).json({ success: false, message: 'Canvas not found' });
         }
 
-        if (canvas.createdBy.toString() !== userId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the creator can add collaborators'
-            });
+        const team = await Team.findById(canvas.teamId);
+        if (!team) {
+            return res.status(404).json({ success: false, message: 'Team not found' });
+        }
+
+        // CHANGED: Any team member can add collaborators
+        const isMember = isTeamMember(team, userId);
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isMember && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'Only team members can delete this canvas' });
         }
 
         const userToAdd = await User.findOne({ email });
         if (!userToAdd) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         if (canvas.collaborators.some(c => c.user.toString() === userToAdd._id.toString())) {
-            return res.status(400).json({
-                success: false,
-                message: 'User is already a collaborator'
-            });
+            return res.status(400).json({ success: false, message: 'User is already a collaborator' });
         }
 
         canvas.collaborators.push({
@@ -364,8 +339,8 @@ export const addCollaborator = async (req, res) => {
         await canvas.save();
 
         const updatedCanvas = await Canvas.findById(id)
-            .populate('createdBy', 'fullName email profilePic')
-            .populate('collaborators.user', 'fullName email profilePic');
+            .populate('createdBy', 'name email profilePic')
+            .populate('collaborators.user', 'name email profilePic');
 
         const socketId = userSocketMap[userToAdd._id];
         if (socketId) {
@@ -376,18 +351,11 @@ export const addCollaborator = async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            canvas: updatedCanvas,
-            message: 'Collaborator added successfully'
-        });
+        res.json({ success: true, canvas: updatedCanvas, message: 'Collaborator added successfully' });
 
     } catch (error) {
         console.error('Add collaborator error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to add collaborator'
-        });
+        res.status(500).json({ success: false, message: error.message || 'Failed to add collaborator' });
     }
 };
 
@@ -399,17 +367,19 @@ export const removeCollaborator = async (req, res) => {
 
         const canvas = await Canvas.findById(id);
         if (!canvas) {
-            return res.status(404).json({
-                success: false,
-                message: 'Canvas not found'
-            });
+            return res.status(404).json({ success: false, message: 'Canvas not found' });
         }
 
-        if (canvas.createdBy.toString() !== userId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the creator can remove collaborators'
-            });
+        const team = await Team.findById(canvas.teamId);
+        if (!team) {
+            return res.status(404).json({ success: false, message: 'Team not found' });
+        }
+
+        // CHANGED: Any team member can remove collaborators
+        const isMember = isTeamMember(team, userId);
+        const isAdmin = isTeamAdmin(team, userId)
+        if (!isMember && !isAdmin) {
+            return res.status(403).json({ success: false, message: 'Only team members can delete this canvas' });
         }
 
         canvas.collaborators = canvas.collaborators.filter(
@@ -418,8 +388,8 @@ export const removeCollaborator = async (req, res) => {
         await canvas.save();
 
         const updatedCanvas = await Canvas.findById(id)
-            .populate('createdBy', 'fullName email profilePic')
-            .populate('collaborators.user', 'fullName email profilePic');
+            .populate('createdBy', 'name email profilePic')
+            .populate('collaborators.user', 'name email profilePic');
 
         const socketId = userSocketMap[collaboratorId];
         if (socketId) {
@@ -429,17 +399,10 @@ export const removeCollaborator = async (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            canvas: updatedCanvas,
-            message: 'Collaborator removed successfully'
-        });
+        res.json({ success: true, canvas: updatedCanvas, message: 'Collaborator removed successfully' });
 
     } catch (error) {
         console.error('Remove collaborator error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message || 'Failed to remove collaborator'
-        });
+        res.status(500).json({ success: false, message: error.message || 'Failed to remove collaborator' });
     }
 };
