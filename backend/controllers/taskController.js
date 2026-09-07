@@ -97,7 +97,7 @@ export const getTaskById = async(req, res) => {
 // @access - Private
 export const createTask = async(req, res) => {
     try {
-        const {title, description, priority, dueDate, assignedTo, attachments, todoChecklist} = req.body
+        const {title, description, priority, dueDate, teamId, assignedTo, attachments, todoChecklist} = req.body
 
         if (!Array.isArray(assignedTo)){
             return res.status(400).json({message: "assignedTo must be array of user id"})
@@ -108,6 +108,7 @@ export const createTask = async(req, res) => {
             description,
             priority,
             dueDate,
+            teamId,
             assignedTo,
             createdBy: req.user._id,
             todoChecklist,
