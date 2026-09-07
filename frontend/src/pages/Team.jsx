@@ -12,7 +12,8 @@ import {
     Edit2, Save, RefreshCw, File, Folder,
     Globe,
     Lock,
-    ListTodo
+    ListTodo,
+    Pencil
 } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import { useTeam } from '../context/TeamContext';
@@ -24,6 +25,7 @@ import axios from 'axios';
 
 import TeamFiles from '../components/TeamFiles';
 import TeamFileList from '../components/TeamFileList';
+import TaskCard from '../components/TaskCard';
 
 const Team = () => {
     const [view, setView] = useState('grid');
@@ -868,6 +870,11 @@ const handleFileDeleted = (fileId) => {
     const handleTaskSubmit = async (e) => {
         e.preventDefault();
         if (!taskForm.title.trim()) return toast.error('Task title is required');
+
+        if (!selectedTeamId) {
+            toast.error('No team selected. Please select a team first.');
+            return;
+        }
         
         try {
             if (editingTask) {
@@ -1519,37 +1526,47 @@ const handleFileDeleted = (fileId) => {
     <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {teamTasks.length > 0 ? (
             teamTasks.map(task => (
-                <div key={task._id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                        <div>
-                            <p className="font-medium text-slate-800 dark:text-white">{task.title}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Assigned to: {task.assignedTo?.map(u => u.fullName).join(', ') || 'Unassigned'}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                                task.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : 
-                                task.status === 'In Progress' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
-                            }`}>{task.status}</span>
-                            {isTeamAdmin() && (
-                                <>
-                                    <button onClick={() => openEditTaskModal(task)} className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"><Pencil className="w-4 h-4" /></button>
-                                    <button onClick={() => handleDeleteTask(task._id)} className="p-1 text-red-600 hover:bg-red-100 rounded"><Trash2 className="w-4 h-4" /></button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-3">
-                        <span className="text-xs text-slate-500 min-w-[60px]">Progress:</span>
-                        <input 
-                            type="range" min="0" max="100" value={task.progress || 0}
-                            onChange={(e) => handleProgressChange(task._id, parseInt(e.target.value))}
-                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                        />
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[40px] text-right">{task.progress || 0}%</span>
-                    </div>
-                </div>
+                // <div key={task._id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                //     <div className="flex items-center justify-between mb-2">
+                //         <div>
+                //             <p className="font-medium text-slate-800 dark:text-white">{task.title}</p>
+                //             <p className="text-xs text-slate-500 dark:text-slate-400">
+                //                 Assigned to: {task.assignedTo?.map(u => u.fullName).join(', ') || 'Unassigned'}
+                //             </p>
+                //         </div>
+                //         <div className="flex items-center gap-2">
+                //             <span className={`px-2 py-1 text-xs rounded-full ${
+                //                 task.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : 
+                //                 task.status === 'In Progress' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
+                //             }`}>{task.status}</span>
+                //             {isTeamAdmin() && (
+                //                 <>
+                //                     <button onClick={() => openEditTaskModal(task)} className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"><Pencil className="w-4 h-4" /></button>
+                //                     <button onClick={() => handleDeleteTask(task._id)} className="p-1 text-red-600 hover:bg-red-100 rounded"><Trash2 className="w-4 h-4" /></button>
+                //                 </>
+                //             )}
+                //         </div>
+                //     </div>
+                //     <div className="flex items-center gap-3 mt-3">
+                //         <span className="text-xs text-slate-500 min-w-[60px]">Progress:</span>
+                //         <input 
+                //             type="checkbox" value={task.progress || 0}
+                //             onChange={(e) => handleProgressChange(task._id, parseInt(e.target.value))}
+                //             className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                //         />
+                //         <span className="text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[40px] text-right">{task.progress || 0}%</span>
+                //     </div>
+                // </div>
+                <TaskCard 
+                    key={task._id}
+                    task={task}
+                    isAdmin={!viewOnlyMode && isTeamAdmin()}
+                    onEdit={openEditTaskModal}
+                    onDelete={handleDeleteTask}
+                    onProgressChange={handleProgressChange}
+                    teamMembers={selectedTeam?.members || []}
+                    currentUser={authUser}
+                />
             ))
         ) : (
             <div className="p-8 text-center text-slate-500 dark:text-slate-400">
