@@ -256,7 +256,7 @@ const CanvasDashboard = () => {
 
     return (
         <>
-        <DashboardLayout>
+        <>
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -305,7 +305,7 @@ const CanvasDashboard = () => {
 
             <CreateCanvasModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} onCreate={handleCreateCanvas} />
             <CanvasViewModal isOpen={showCanvasModal} onClose={handleCloseCanvasModal} canvasId={selectedCanvasId} teamId={currentTeamId} />
-            </DashboardLayout>
+            </>
         </>
     );
 };

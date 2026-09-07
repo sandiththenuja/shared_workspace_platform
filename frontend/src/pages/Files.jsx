@@ -275,16 +275,16 @@ const Files = () => {
 
     if (loading || teamLoading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center h-96">
                     <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -586,7 +586,7 @@ const Files = () => {
                 )}
 
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

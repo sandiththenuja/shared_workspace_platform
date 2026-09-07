@@ -120,7 +120,7 @@ const Analytics = () => {
     const uniqueMembers = Array.from(new Map(allTeamMembers.map(m => [m._id, m])).values());
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -390,7 +390,7 @@ const Analytics = () => {
                     </>
                 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

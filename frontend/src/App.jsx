@@ -14,6 +14,7 @@ import Analytics from './pages/Analytics'
 import Calendar from './pages/Calendar'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import CanvasDashboard from './pages/CanvasDashboard'
+import DashboardRouter from './layout/DashboardRouter'
 
 function App() {
   const {authUser} = useContext(AuthContext)
@@ -25,15 +26,15 @@ function App() {
       <Routes>
         <Route path='/' element={<LandingPage />} />
         <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
-        <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path='/chat' element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path='/files' element={<ProtectedRoute><Files /></ProtectedRoute>} />
-        <Route path='/team' element={<ProtectedRoute><Team /></ProtectedRoute>} />
-        <Route path='/analytics' element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-        <Route path='/calendar' element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
-        <Route path='/canvas' element={<ProtectedRoute><CanvasDashboard /></ProtectedRoute>} />
+        <Route path='/dashboard' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/chat' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/files' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/team' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/analytics' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/calendar' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/canvas' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         {/* <Route path="/canvas/:teamId" element={<ProtectedRoute><CanvasDashboard /></ProtectedRoute>} /> */}
-        <Route path='/profile' element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path='/profile' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
       </Routes>
     </div>
 

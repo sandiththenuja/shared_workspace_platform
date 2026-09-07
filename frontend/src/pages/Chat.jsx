@@ -613,7 +613,7 @@ const Chat = () => {
     );
 
     return (
-        <DashboardLayout>
+        <>
             <div className="h-[calc(100vh-120px)] flex gap-4">
                 {/* Chat List */}
                 <div className="w-full md:w-80 lg:w-96 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden flex flex-col">
@@ -1015,7 +1015,7 @@ const Chat = () => {
                     </div>
                 </div>
             )}
-        </DashboardLayout>
+        </>
     );
 };
 

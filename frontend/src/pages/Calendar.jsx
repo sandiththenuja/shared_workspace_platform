@@ -278,7 +278,7 @@ const Calendar = () => {
     };
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -592,7 +592,7 @@ const Calendar = () => {
                     />
                 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

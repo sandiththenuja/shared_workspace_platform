@@ -145,19 +145,19 @@ const Dashboard = () => {
 
     if (loading || taskLoading || teamLoading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center h-96">
                     <div className="flex flex-col items-center gap-4">
                         <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
                         <p className="text-slate-500 dark:text-slate-400">Loading dashboard...</p>
                     </div>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 {/* Welcome Section with Role Badge */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -467,7 +467,7 @@ const Dashboard = () => {
                     </div>
                 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

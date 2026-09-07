@@ -133,7 +133,7 @@ const ProfilePage = () => {
     };
 
     return (
-        <DashboardLayout>
+        <>
             <div className="max-w-3xl mx-auto py-8 px-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -390,7 +390,7 @@ const ProfilePage = () => {
                     </div>
                 </div>
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

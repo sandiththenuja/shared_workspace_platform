@@ -140,7 +140,10 @@ const handleFileDeleted = (fileId) => {
 
     // Add this line right below your other useEffect hooks to ensure tasks are loaded
     const teamTasks = tasks.filter(task => (task.teamId?._id || task.teamId) === selectedTeamId);
-
+    console.log(tasks);
+    console.log(teamTasks);
+    console.log(selectedTeamId);
+    
     // Check if user is authenticated
     useEffect(() => {
         if (!authUser || !token) {
@@ -938,7 +941,7 @@ const handleFileDeleted = (fileId) => {
     // No teams state
     if (teams.length === 0 && !teamLoading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex flex-col items-center justify-center h-96">
                     <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
                         <Building2 className="w-10 h-10 text-slate-400" />
@@ -988,12 +991,12 @@ const handleFileDeleted = (fileId) => {
                     onCreateTeam={handleCreateTeam}
                     isCreating={isCreating}
                 />
-            </DashboardLayout>
+            </>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="space-y-6">
                 {/* Error Display */}
                 {error && (
@@ -2157,7 +2160,7 @@ const handleFileDeleted = (fileId) => {
     </div>
 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 
