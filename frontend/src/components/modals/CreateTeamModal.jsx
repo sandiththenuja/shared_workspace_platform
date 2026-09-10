@@ -14,7 +14,7 @@ const CreateTeamModal = ({
 }) => {
     const [teamName, setTeamName] = useState('');
     const [description, setDescription] = useState('');
-    const [privacy, setPrivacy] = useState('private'); // 'private' or 'public'
+    const [privacy, setPrivacy] = useState(true); // 'private' or 'public'
     const [inviteCode, setInviteCode] = useState('');
     const [errors, setErrors] = useState({});
     const [createdTeam, setCreatedTeam] = useState(null);
@@ -27,7 +27,7 @@ const CreateTeamModal = ({
         if (isOpen) {
             setTeamName('');
             setDescription('');
-            setPrivacy('private');
+            setPrivacy(true);
             setInviteCode('');
             setErrors({});
             setCreatedTeam(null);
@@ -86,13 +86,15 @@ const CreateTeamModal = ({
         const teamData = {
             name: teamName.trim(),
             description: description.trim(),
-            privacy,
+            isPrivate: privacy,
             inviteCode: inviteCode.trim() || null, // Send empty code as null
-            teamImage: teamImagePreview || null
+            coverImg: teamImagePreview || null
         };
 
         try {
             const result = await onCreateTeam(teamData);
+            console.log("team data", teamData);
+            
             if (result) {
                 setCreatedTeam(result);
                 // Auto-close after 5 seconds or let user copy invite code
@@ -372,15 +374,15 @@ const CreateTeamModal = ({
                             <div className="grid grid-cols-2 gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => setPrivacy('private')}
+                                    onClick={() => setPrivacy(true)}
                                     className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                                        privacy === 'private'
+                                        privacy
                                             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
                                             : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                                     }`}
                                 >
                                     <Lock className={`w-5 h-5 ${
-                                        privacy === 'private' 
+                                        privacy 
                                             ? 'text-indigo-600 dark:text-indigo-400' 
                                             : 'text-slate-400'
                                     }`} />
@@ -391,15 +393,15 @@ const CreateTeamModal = ({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setPrivacy('public')}
+                                    onClick={() => setPrivacy(false)}
                                     className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                                        privacy === 'public'
+                                        !privacy
                                             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
                                             : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                                     }`}
                                 >
                                     <Globe className={`w-5 h-5 ${
-                                        privacy === 'public' 
+                                        !privacy 
                                             ? 'text-indigo-600 dark:text-indigo-400' 
                                             : 'text-slate-400'
                                     }`} />

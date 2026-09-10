@@ -26,6 +26,9 @@ import axios from 'axios';
 import TeamFiles from '../components/TeamFiles';
 import TeamFileList from '../components/TeamFileList';
 import TaskCard from '../components/TaskCard';
+import TodoListInput from '../components/TodoListInput';
+import { useNavigate } from 'react-router-dom';
+import AddAttachmentsInput from '../components/AddAttachmentsInput';
 
 const Team = () => {
     const [view, setView] = useState('grid');
@@ -84,6 +87,11 @@ const Team = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
 
     const [fileUploaded, setFileUploaded] = useState(false);
+    const navigate = useNavigate()
+
+    const handleValueChange = (key, value) => {
+        setTaskForm((prevData) => ({...prevData, [key]: value}))
+    }
 
     const handleFileUploaded = (updatedTeam) => {
     if (updatedTeam) {
@@ -138,13 +146,12 @@ const handleFileDeleted = (fileId) => {
     } = useTeam();
     
     const { authUser, token } = useAuth();
-    const { tasks, getTasks } = useTask();
+    const { tasks, getTasks, createTask, updateTask, deleteTask, updateTaskStatus, updateTaskChecklist } = useTask();
 
     // Add this line right below your other useEffect hooks to ensure tasks are loaded
     const teamTasks = tasks.filter(task => (task.teamId?._id || task.teamId) === selectedTeamId);
-    console.log(tasks);
-    console.log(teamTasks);
-    console.log(selectedTeamId);
+    console.log("tasks", tasks);
+    console.log("team tasks", teamTasks);
     
     // Check if user is authenticated
     useEffect(() => {
@@ -175,6 +182,9 @@ const handleFileDeleted = (fileId) => {
         
         loadTeams();
     }, [authUser, token]);
+
+    const privateTeams = teams.filter(team => team.isPrivate && team.createdBy === authUser._id);
+    console.log("private", privateTeams);
 
     // Set first team as selected when teams load
     useEffect(() => {
@@ -774,11 +784,9 @@ const handleFileDeleted = (fileId) => {
                 setSelectedTeam(null);
                 setSelectedTeamId(null);
                 await fetchTeams();
-                if (teams.length > 0) {
-                    setSelectedTeamId(teams[0]._id);
-                }
                 toast.success('Team deleted successfully!');
             }
+            
         } catch (err) {
             console.error('Failed to delete team:', err);
             setError(err.response?.data?.message || 'Failed to delete team. Please try again.');
@@ -846,8 +854,8 @@ const handleFileDeleted = (fileId) => {
     const openCreateTaskModal = () => {
         setEditingTask(null);
         setTaskForm({
-            title: '', description: '', priority: 'Medium', status: 'Pending', 
-            dueDate: '', teamId: selectedTeamId, assignedTo: [], progress: 0
+            title: '', description: '', priority: 'Low',
+            dueDate: null, teamId: selectedTeamId, assignedTo: [], todoChecklist: [], attachments: []
         });
         setIsTaskModalOpen(true);
     };
@@ -858,11 +866,11 @@ const handleFileDeleted = (fileId) => {
             title: task.title || '',
             description: task.description || '',
             priority: task.priority || 'Medium',
-            status: task.status || 'Pending',
             dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
             teamId: task.teamId?._id || task.teamId || selectedTeamId,
             assignedTo: task.assignedTo?.map(u => u._id) || [],
-            progress: task.progress || 0
+            todoChecklist: task.todoChecklist,
+            attachments: task.attachments
         });
         setIsTaskModalOpen(true);
     };
@@ -877,11 +885,35 @@ const handleFileDeleted = (fileId) => {
         }
         
         try {
+            const formattedTodoChecklist = (taskForm.todoChecklist || []).map((item) => {
+            // If item is a string, convert to object
+            if (typeof item === 'string') {
+                return { text: item, completed: false };
+            }
+            // If item is already an object, ensure it has the right structure
+            return {
+                text: item.text || '',
+                completed: item.completed || false
+            };
+        });
+        const taskData = {
+            title: taskForm.title.trim(),
+            description: taskForm.description?.trim() || '',
+            priority: taskForm.priority || 'Medium',
+            dueDate: taskForm.dueDate || null,
+            teamId: selectedTeamId,  // ✅ Make sure teamId is included
+            assignedTo: taskForm.assignedTo || [],
+            todoChecklist: formattedTodoChecklist,  // ✅ Use "todoChecklist" (not "todoCheckList")
+            attachments: taskForm.attachments || []
+        };
+
+        console.log('📤 Sending task data:', taskData);  // ✅ Debug log
+
             if (editingTask) {
                 await axios.put(`/api/tasks/${editingTask._id}`, taskForm);
                 toast.success('Task updated successfully');
             } else {
-                await axios.post('/api/tasks', taskForm);
+                await axios.post('/api/tasks', taskData);
                 toast.success('Task created successfully');
             }
             await getTasks();
@@ -911,6 +943,63 @@ const handleFileDeleted = (fileId) => {
             toast.error('Failed to update progress');
         }
     };
+
+    // pages/Team.jsx - Fix the updateTodoChecklist function
+
+    // ✅ FIXED: Proper updateTodoChecklist function
+    const updateTodoChecklist = async (taskId, index) => {
+        // Find the task in teamTasks
+        const task = teamTasks.find(t => t._id === taskId);
+        if (!task) {
+            toast.error('Task not found');
+            return;
+        }
+
+        // Create a copy of the todo checklist
+        const todoChecklist = [...(task.todoChecklist || [])];
+        
+        // Toggle the completed status
+        if (todoChecklist && todoChecklist[index]) {
+            todoChecklist[index].completed = !todoChecklist[index].completed;
+        } else {
+            toast.error('Todo item not found');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.put(
+                `/api/tasks/${taskId}/todo`,
+                { todoChecklist },
+                {
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.status === 200 || response.data.success) {
+                // Refresh tasks
+                await getTasks();
+                toast.success('Todo checklist updated');
+            } else {
+                // Revert the change
+                todoChecklist[index].completed = !todoChecklist[index].completed;
+                toast.error('Failed to update todo checklist');
+            }
+        } catch (error) {
+            // Revert the change on error
+            todoChecklist[index].completed = !todoChecklist[index].completed;
+            console.error('Error updating todo checklist:', error);
+            toast.error(error.response?.data?.message || 'Failed to update todo checklist');
+        }
+    };
+
+    const handleClick = (taskId) => {
+        navigate(`/team/task/${taskId}`)
+    }
+
 
     // Loading state
     if (teamLoading && teams.length === 0) {
@@ -1079,7 +1168,7 @@ const handleFileDeleted = (fileId) => {
                         {teams.map((team) => {
                             const isMember = checkIfUserIsMember(team);
                             const teamImg = team.image || null;
-                            return (
+                            return (    
                                 <button
                                     key={team._id}
                                     onClick={() => handleTeamSelect(team._id)}
@@ -1557,6 +1646,7 @@ const handleFileDeleted = (fileId) => {
                 //         <span className="text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[40px] text-right">{task.progress || 0}%</span>
                 //     </div>
                 // </div>
+                <div onClick={() => handleClick(task._id)}>
                 <TaskCard 
                     key={task._id}
                     task={task}
@@ -1564,9 +1654,11 @@ const handleFileDeleted = (fileId) => {
                     onEdit={openEditTaskModal}
                     onDelete={handleDeleteTask}
                     onProgressChange={handleProgressChange}
+                    updateTodoChecklist={updateTodoChecklist}
                     teamMembers={selectedTeam?.members || []}
                     currentUser={authUser}
                 />
+                </div>
             ))
         ) : (
             <div className="p-8 text-center text-slate-500 dark:text-slate-400">
@@ -2122,27 +2214,16 @@ const handleFileDeleted = (fileId) => {
                             <option>Low</option><option>Medium</option><option>High</option>
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                        <select 
-                            value={taskForm.status} 
-                            onChange={(e) => setTaskForm({...taskForm, status: e.target.value})} 
-                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                            <option>Pending</option><option>In Progress</option><option>Completed</option>
-                        </select>
+                    <div className="mt-3">
+                        <label className='text-xs font-medium text-slate-600'>
+                            TODO Checklist
+                        </label>
+
+                        <TodoListInput
+                        todoList={taskForm.todoChecklist || []}
+                        setTodoList={(value) => handleValueChange("todoChecklist", value)} />
                     </div>
                 </div>
-                {editingTask && (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Progress: {taskForm.progress}%</label>
-                        <input 
-                            type="range" min="0" max="100" value={taskForm.progress} 
-                            onChange={(e) => setTaskForm({...taskForm, progress: parseInt(e.target.value)})} 
-                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                        />
-                    </div>
-                )}
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
                     <input 
@@ -2164,6 +2245,15 @@ const handleFileDeleted = (fileId) => {
                     </select>
                     <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple members.</p>
                 </div>
+                <div className="mt-3">
+              <label className='text-xs font-medium text-slate-600'>
+                Add Attachments
+              </label>
+
+              <AddAttachmentsInput
+              attachments={taskForm?.attachments}
+              setAttachments={(value) => handleValueChange("attachments", value)} /> 
+            </div>
                 <div className="flex items-center gap-3 pt-2">
                     <button type="button" onClick={() => setIsTaskModalOpen(false)} className="flex-1 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">
                         Cancel

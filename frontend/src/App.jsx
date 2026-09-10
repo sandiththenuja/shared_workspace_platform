@@ -15,6 +15,7 @@ import Calendar from './pages/Calendar'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import CanvasDashboard from './pages/CanvasDashboard'
 import DashboardRouter from './layout/DashboardRouter'
+import ViewTaskDetails from './components/ViewTaskDetails'
 
 function App() {
   const {authUser} = useContext(AuthContext)
@@ -30,6 +31,7 @@ function App() {
         <Route path='/chat' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/files' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/team' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+        <Route path='/team/task/:id' element={<ProtectedRoute><ViewTaskDetails /></ProtectedRoute>} />
         <Route path='/analytics' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/calendar' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/canvas' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />

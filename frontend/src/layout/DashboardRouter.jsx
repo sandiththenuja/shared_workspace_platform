@@ -1,7 +1,7 @@
 // components/DashboardRouter.jsx
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import DashboardLayout from '../layout/DashboardLayout';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LucidePaperBag } from 'lucide-react';
 
 // Lazy load components for better performance
 const Dashboard = lazy(() => import('../pages/Dashboard'));
@@ -35,7 +35,7 @@ const DashboardRouter = () => {
         { id: 'files', label: 'Files', icon: 'FolderOpen', component: Files },
         { id: 'analytics', label: 'Analytics', icon: 'BarChart3', component: Analytics },
         { id: 'calendar', label: 'Calendar', icon: 'Calendar', component: Calendar },
-        { id: 'canvas', label: 'Canvas', icon: 'Settings', component: CanvasDashboard },
+        { id: 'canvas', label: 'Canvas', icon: 'LucidePaperBag', component: CanvasDashboard },
         { id: 'profile', label: 'Profile', icon: 'User', component: ProfilePage },
     ];
 

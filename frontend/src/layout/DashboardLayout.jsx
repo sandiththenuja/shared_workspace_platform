@@ -5,7 +5,10 @@ import {
     Settings, LogOut, Bell, Search, User, Plus, ChevronDown,
     Sun, Moon, Grid, Inbox, Calendar, FileText, Star, Clock,
     ChevronLeft, ChevronRight, MoreVertical, Activity, PieChart,
-    Layout, Shield, Zap, HelpCircle, TrendingUp, UserPlus
+    Layout, Shield, Zap, HelpCircle, TrendingUp, UserPlus,
+    LucidePaperBag,
+    PaperBagIcon,
+    PenTool
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -47,7 +50,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
         { icon: FolderOpen, label: 'Files', href: '/files', id: 'files' },
         { icon: BarChart3, label: 'Analytics', href: '/analytics', id: 'analytics' },
         { icon: Calendar, label: 'Calendar', href: '/calendar', id: 'calendar' },
-        { icon: Settings, label: 'Canvas', href: '/canvas', id: 'canvas' },
+        { icon: PenTool, label: 'Canvas', href: '/canvas', id: 'canvas' },
         { icon: Settings, label: 'Profile', href: '/profile', id: 'profile' },
     ];
 
@@ -89,7 +92,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                     {isSidebarOpen ? (
                         <>
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                                     <span className="text-white font-bold text-sm">CW</span>
                                 </div>
                                 <span className="font-semibold text-slate-800 dark:text-white text-lg">CollabNest</span>
@@ -103,29 +106,16 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                         </>
                     ) : (
                         <>
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                            <div className="w-8 h-8 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                                 <span className="text-white font-bold text-sm">CW</span>
                             </div>
                             <button 
                                 onClick={() => setIsSidebarOpen(true)}
-                                className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
+                                className="absolute -right-1 w-5 h-5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-md hover:shadow-lg transition-all"
                             >
                                 <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                             </button>
                         </>
-                    )}
-                </div>
-
-                {/* User Profile */}
-                <div className={`flex items-center gap-3 p-4 border-b border-slate-200/80 dark:border-slate-700/80 ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-lg shadow-indigo-500/20 flex-shrink-0">
-                        {authUser?.fullName?.charAt(0) || 'U'}
-                    </div>
-                    {isSidebarOpen && (
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{authUser?.fullName}</p>
-                            <p className="text-xs text-slate-400 truncate">{authUser?.email}</p>
-                        </div>
                     )}
                 </div>
 
@@ -142,7 +132,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                 className={`
                                     flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 w-full
                                     ${isActive 
-                                        ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                                        ? 'bg-linear-to-r from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 text-indigo-600 dark:text-indigo-400 shadow-sm' 
                                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }
                                     ${isSidebarOpen ? 'justify-start' : 'justify-center'}
@@ -167,7 +157,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                 </nav>
 
                 {/* Recent */}
-                {isSidebarOpen && (
+                {/* {isSidebarOpen && (
                     <div className="px-3 py-2 border-t border-slate-200/80 dark:border-slate-700/80">
                         <p className="text-xs font-medium text-slate-400 uppercase tracking-wider px-3 mb-2">Recent</p>
                         {recentItems.map((item, i) => (
@@ -180,7 +170,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                             </button>
                         ))}
                     </div>
-                )}
+                )} */}
 
                 {/* Bottom */}
                 <div className="p-3 border-t border-slate-200/80 dark:border-slate-700/80">
@@ -197,7 +187,6 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                 </div>
             </aside>
 
-            {/* ===== MAIN CONTENT ===== */}
             <div className="flex-1 flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
                 {/* ===== TOP NAVBAR ===== */}
                 <header className={`sticky top-0 z-30 transition-all duration-300 ${
@@ -221,7 +210,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                 <Menu className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                             </button>
 
-                            <div className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-2 min-w-[200px]">
+                            {/* <div className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-2 min-w-[200px]">
                                 <Search className="w-4 h-4 text-slate-400" />
                                 <input 
                                     type="text" 
@@ -229,12 +218,12 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                     className="bg-transparent border-none outline-none text-sm text-slate-600 dark:text-slate-300 placeholder:text-slate-400 flex-1"
                                 />
                                 <kbd className="text-xs text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">⌘K</kbd>
-                            </div>
+                            </div> */}
                         </div>
 
                         <div className="flex items-center gap-2">
                             {/* Dark mode toggle */}
-                            <button 
+                            {/* <button 
                                 onClick={() => setIsDarkMode(!isDarkMode)}
                                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
@@ -243,15 +232,15 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                 ) : (
                                     <Moon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                                 )}
-                            </button>
+                            </button> */}
 
                             {/* Notifications */}
-                            <div className="relative">
+                            {/* <div className="relative">
                                 <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
                                     <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
                                 </button>
-                            </div>
+                            </div> */}
 
                             {/* Profile dropdown */}
                             <div className="relative">
@@ -259,7 +248,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
+                                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
                                         {authUser?.fullName?.charAt(0) || 'U'}
                                     </div>
                                     <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
@@ -296,7 +285,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                     </div>
 
                     {/* Mobile search */}
-                    <div className="md:hidden px-4 pb-3">
+                    {/* <div className="md:hidden px-4 pb-3">
                         <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-2">
                             <Search className="w-4 h-4 text-slate-400" />
                             <input 
@@ -305,7 +294,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                 className="bg-transparent border-none outline-none text-sm text-slate-600 dark:text-slate-300 placeholder:text-slate-400 flex-1"
                             />
                         </div>
-                    </div>
+                    </div> */}
                 </header>
 
                 {/* ===== PAGE CONTENT ===== */}
