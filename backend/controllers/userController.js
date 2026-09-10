@@ -5,10 +5,10 @@ import bcrypt from 'bcryptjs';
 import cloudinary from '../lib/cloudinary.js';
 
 export const signup = async(req, res) => {
-    const {name, email, password, bio} = req.body;
+    const {fullName, email, password, bio} = req.body;
 
     try {
-        if(!name || !email || !password || !bio){
+        if(!fullName || !email || !password || !bio){
             return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
@@ -22,7 +22,7 @@ export const signup = async(req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = await User.create({
-            name, 
+            fullName, 
             email, 
             password: hashedPassword, 
             bio
@@ -32,7 +32,7 @@ export const signup = async(req, res) => {
 
         const userData = {
             _id: newUser._id,
-            name: newUser.name,
+            fullName: newUser.fullName,
             email: newUser.email,
             bio: newUser.bio,
             profilePic: newUser.profilePic || ""
