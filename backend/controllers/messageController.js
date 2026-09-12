@@ -9,14 +9,34 @@ export const getUsersForSidebar = async(req, res) => {
         const filteredUsers = await User.find({_id: {$ne: userId}}).select("-password");
 
         const unseenMessages = {};
+        const lastMessages = {}
         const promises = filteredUsers.map(async (user) => {
             const messages = await Message.find({senderId: user._id, receiverId: userId, seen: false});
+            
             if(messages.length > 0){
                 unseenMessages[user._id] = messages.length;
             }
+
+            const last = await Message.findOne({
+                $or: [
+                    { senderId: user._id, receiverId: userId },
+                    { senderId: userId, receiverId: user._id },
+                ],
+            })
+            .sort({ createdAt: -1 })
+            .select("text image createdAt senderId seen");
+
+            if (last) {
+                lastMessages[user._id] = {
+                    text: last.text || (last.image ? '📷 Image' : ''),
+                    createdAt: last.createdAt,
+                    senderId: last.senderId,
+                    seen: last.seen,
+                };
+            }
         });
         await Promise.all(promises);
-        res.json({ success: true, users: filteredUsers, unseenMessages });
+        res.json({ success: true, users: filteredUsers, unseenMessages, lastMessages });
     } catch (error) {
         console.log(error.message);
         res.json({ success: false, message: error.message });

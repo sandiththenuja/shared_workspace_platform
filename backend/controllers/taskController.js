@@ -1,4 +1,6 @@
 import Task from "../models/Task.js";
+import Message from "../models/Message.js"
+import Team from "../models/Team.js"
 
 // @desc - get all tasks (admin - all, user - tasks)
 // @route - GET/api/tasks
@@ -259,6 +261,51 @@ export const getDashboardData = async(req, res) => {
             dueDate: {$lt: new Date()}
         })
 
+        const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // Total tasks created in 1 day
+        const currentPeriodTasks = await Task.countDocuments({
+            createdAt: { $gte: sevenDaysAgo }
+        });
+
+        // Total tasks created in previous 7 days
+        const previousPeriodTasks = await Task.countDocuments({
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        // Completed tasks in 1 day
+        const currentCompletedTasks = await Task.countDocuments({
+            status: 'Completed',
+            updatedAt: { $gte: sevenDaysAgo }
+        });
+
+        // Completed tasks in previous 30 days
+        const previousCompletedTasks = await Task.countDocuments({
+            status: 'Completed',
+            updatedAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        // Messages count (example - replace with your actual Message model)
+        const currentMessages = await Message.countDocuments({
+            createdAt: { $gte: sevenDaysAgo }
+        });
+        const previousMessages = await Message.countDocuments({
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const calculateChange = (current, previous) => {
+            if (previous === 0) {
+                return current > 0 ? 100 : 0;
+            }
+            const change = ((current - previous) / previous) * 100;
+            return Math.round(change * 10) / 10; // Round to 1 decimal
+        };
+
         // ensure all possible status are included
         const taskStatuses = ["Pending", "In Progress", "Completed"]
         const taskDistributionRaw = await Task.aggregate([
@@ -305,6 +352,23 @@ export const getDashboardData = async(req, res) => {
                 completedTasks,
                 overdueTasks
             },
+            trends: {
+                    totalTasks: {
+                        current: currentPeriodTasks,
+                        previous: previousPeriodTasks,
+                        change: calculateChange(currentPeriodTasks, previousPeriodTasks)
+                    },
+                    completedTasks: {
+                        current: currentCompletedTasks,
+                        previous: previousCompletedTasks,
+                        change: calculateChange(currentCompletedTasks, previousCompletedTasks)
+                    },
+                    messages: {
+                        current: currentMessages,
+                        previous: previousMessages,
+                        change: calculateChange(currentMessages, previousMessages)
+                    }
+                },
             charts: {
                 taskDistribution,
                 taskPriorityLevels
@@ -328,6 +392,76 @@ export const getUserDashboardData = async(req, res) => {
         const pendingTasks = await Task.countDocuments({assignedTo: userId, status: "Pending"})
         const completedTasks = await Task.countDocuments({assignedTo: userId, status: "Completed"})
         const overdueTasks = await Task.countDocuments({assignedTo: userId, status: {$ne: "Completed"}, dueDate: {$lt: new Date()}})
+
+        const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const currentPeriodTasks = await Task.countDocuments({
+            assignedTo: userId,
+            createdAt: { $gte: sevenDaysAgo }
+        });
+
+        const previousPeriodTasks = await Task.countDocuments({
+            assignedTo: userId,
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const currentCompletedTasks = await Task.countDocuments({
+            assignedTo: userId,
+            status: 'Completed',
+            updatedAt: { $gte: sevenDaysAgo }
+        });
+
+        const previousCompletedTasks = await Task.countDocuments({
+            assignedTo: userId,
+            status: 'Completed',
+            updatedAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const currentSentMessages = await Message.countDocuments({
+            senderId: userId,
+            createdAt: { $gte: sevenDaysAgo }
+        });
+        const currentReceivedMessages = await Message.countDocuments({
+            receiverId: userId,
+            createdAt: { $gte: sevenDaysAgo }
+        });
+        const previousSentMessages = await Message.countDocuments({
+            senderId: userId,
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+        const previousReceivedMessages = await Message.countDocuments({
+            receiverId: userId,
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const memberCount = await Team.countDocuments({
+            members: userId,
+            createdAt: { $gte: sevenDaysAgo }
+        });
+        const memberCount2 = await Team.countDocuments({
+            members: userId,
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const adminCount = await Team.countDocuments({
+            createdBy: userId,
+            createdAt: { $gte: sevenDaysAgo }
+        });
+        const adminCount2 = await Team.countDocuments({
+            createdBy: userId,
+            createdAt: { $gte: thirtyDaysAgo, $lt: sevenDaysAgo }
+        });
+
+        const calculateChange = (current, previous) => {
+            if (previous === 0) return current > 0 ? 100 : 0;
+            return Math.round(((current - previous) / previous) * 1000) / 10;
+        };
+
 
         // task distribution by status
         const taskStatuses = ["Pending", "In Progress", "Completed"]
@@ -371,6 +505,28 @@ export const getUserDashboardData = async(req, res) => {
                 completedTasks,
                 overdueTasks
             },
+            trends: {
+                    totalTasks: {
+                        current: currentPeriodTasks,
+                        previous: previousPeriodTasks,
+                        change: calculateChange(currentPeriodTasks, previousPeriodTasks)
+                    },
+                    completedTasks: {
+                        current: currentCompletedTasks,
+                        previous: previousCompletedTasks,
+                        change: calculateChange(currentCompletedTasks, previousCompletedTasks)
+                    },
+                    messages: {
+                        current: currentSentMessages+currentReceivedMessages,
+                        previous: previousSentMessages+previousReceivedMessages,
+                        change: calculateChange(currentSentMessages+currentReceivedMessages, previousSentMessages+previousReceivedMessages)
+                    },
+                    users: {
+                        current: memberCount+adminCount,
+                        previous: memberCount2+adminCount2,
+                        change: calculateChange(memberCount+adminCount, memberCount2+adminCount2)
+                    }
+                },
             charts: {
                 taskDistribution,
                 taskPriorityLevels
