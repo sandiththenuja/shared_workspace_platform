@@ -1,11 +1,11 @@
-// pages/Calendar.js
-import React, { useState, useEffect } from 'react';
+// pages/Calendar.jsx
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    ChevronLeft, ChevronRight, Plus, 
-    Clock, Users, MapPin, MoreVertical,
-    Calendar as CalendarIcon, List, Grid,
-    Filter, Search, CheckCircle, AlertCircle,
-    Loader2, Edit2, Trash2, X
+    ChevronLeft, ChevronRight, Plus,
+    Clock, AlertCircle,
+    Calendar as CalendarIcon, Search,
+    CheckCircle, Loader2, Trash2, X,
+    ListTodo,
 } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import { useTask } from '../context/TaskContext';
@@ -14,22 +14,39 @@ import { useAuth } from '../context/AuthContext';
 const Calendar = () => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [view, setView] = useState('month');
-    const [selectedDate, setSelectedDate] = useState(null);
-    const [showEventModal, setShowEventModal] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all');
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedDayMobile, setSelectedDayMobile] = useState(null);
 
     const { tasks, getTasks, updateTaskStatus, deleteTask, loading: taskLoading } = useTask();
     const { authUser } = useAuth();
 
-    // Fetch tasks on mount
     useEffect(() => {
-        if (authUser) {
-            fetchTasks();
-        }
+        if (authUser) fetchTasks();
     }, [authUser]);
+
+    // Lock body scroll when modal is open
+    useEffect(() => {
+        if (selectedEvent) {
+            const prev = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = prev;
+            };
+        }
+    }, [selectedEvent]);
+
+    // Escape key closes modal
+    useEffect(() => {
+        if (!selectedEvent) return;
+        const onKey = (e) => {
+            if (e.key === 'Escape') setSelectedEvent(null);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [selectedEvent]);
 
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -38,114 +55,159 @@ const Calendar = () => {
     };
 
     // Convert tasks to calendar events
-    const getCalendarEvents = () => {
+    const events = useMemo(() => {
         if (!tasks || tasks.length === 0) return [];
-
         return tasks
-            .filter(task => task.dueDate)
-            .map(task => {
+            .filter((task) => task.dueDate)
+            .map((task) => {
                 const dueDate = new Date(task.dueDate);
                 return {
                     id: task._id,
                     title: task.title,
                     description: task.description || '',
-                    time: dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    time: dueDate.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    }),
                     date: dueDate.getDate(),
                     month: dueDate.getMonth(),
                     year: dueDate.getFullYear(),
+                    fullDate: dueDate,
                     type: 'task',
-                    color: task.status === 'Completed' ? 'emerald' :
-                           task.status === 'In Progress' ? 'blue' :
-                           task.priority === 'High' ? 'red' :
-                           task.priority === 'Medium' ? 'orange' : 'indigo',
+                    color:
+                        task.status === 'Completed'
+                            ? 'emerald'
+                            : task.status === 'In Progress'
+                            ? 'blue'
+                            : task.priority === 'High'
+                            ? 'red'
+                            : task.priority === 'Medium'
+                            ? 'orange'
+                            : 'indigo',
                     status: task.status,
                     priority: task.priority,
                     progress: task.progress || 0,
                     assignedTo: task.assignedTo || [],
-                    createdBy: task.createdBy
+                    createdBy: task.createdBy,
                 };
             });
-    };
+    }, [tasks]);
 
-    const events = getCalendarEvents();
+    // Filter
+    const filteredEvents = useMemo(
+        () =>
+            events.filter((event) => {
+                const s = searchTerm.toLowerCase();
+                const matchesSearch =
+                    event.title.toLowerCase().includes(s) ||
+                    (event.description &&
+                        event.description.toLowerCase().includes(s));
+                const matchesFilter =
+                    filterType === 'all' || event.status === filterType;
+                return matchesSearch && matchesFilter;
+            }),
+        [events, searchTerm, filterType]
+    );
 
-    // Filter events by search and type
-    const filteredEvents = events.filter(event => {
-        const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesFilter = filterType === 'all' || event.status === filterType;
-        return matchesSearch && matchesFilter;
-    });
-
-    // Get events for a specific date
-    const getEventsForDate = (date) => {
-        return filteredEvents.filter(event => 
-            event.date === date.getDate() &&
-            event.month === date.getMonth() &&
-            event.year === date.getFullYear()
+    const getEventsForDate = (date) =>
+        filteredEvents.filter(
+            (event) =>
+                event.date === date.getDate() &&
+                event.month === date.getMonth() &&
+                event.year === date.getFullYear()
         );
-    };
 
-    // Get days in month
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
         const month = date.getMonth();
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const days = [];
-        
+
         const firstDayOfWeek = firstDay.getDay();
         for (let i = firstDayOfWeek - 1; i >= 0; i--) {
             const d = new Date(year, month, -i);
             days.push({ date: d, isCurrentMonth: false });
         }
-        
+
         for (let i = 1; i <= lastDay.getDate(); i++) {
             const d = new Date(year, month, i);
             days.push({ date: d, isCurrentMonth: true });
         }
-        
+
         const remainingDays = 42 - days.length;
         for (let i = 1; i <= remainingDays; i++) {
             const d = new Date(year, month + 1, i);
             days.push({ date: d, isCurrentMonth: false });
         }
-        
+
         return days;
     };
 
     const days = getDaysInMonth(currentMonth);
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+    ];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // Stable overdue check using full dates
+    const isOverdue = (event) => {
+        if (event.status === 'Completed') return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eventDay = new Date(event.year, event.month, event.date);
+        return eventDay < today;
+    };
 
     const getColorClass = (color) => {
         const colors = {
-            indigo: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400',
-            purple: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400',
-            emerald: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-            blue: 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400',
-            orange: 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400',
-            red: 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400',
+            indigo: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300',
+            purple: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300',
+            emerald: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+            blue: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+            orange: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+            red: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300',
         };
         return colors[color] || colors.indigo;
     };
 
-    const getStatusBadge = (status) => {
-        const badges = {
-            'Pending': 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400',
-            'In Progress': 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400',
-            'Completed': 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+    const getColorBar = (color) => {
+        const bars = {
+            indigo: 'bg-indigo-500',
+            purple: 'bg-purple-500',
+            emerald: 'bg-emerald-500',
+            blue: 'bg-blue-500',
+            orange: 'bg-orange-500',
+            red: 'bg-red-500',
         };
-        return badges[status] || badges['Pending'];
+        return bars[color] || bars.indigo;
     };
 
-    // Handle task status update
+    const getStatusBadge = (status) => {
+        const badges = {
+            Pending: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300',
+            'In Progress': 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+            Completed: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+        };
+        return badges[status] || badges.Pending;
+    };
+
+    const getPriorityBadge = (priority) => {
+        const badges = {
+            High: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300',
+            Medium: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+            Low: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+        };
+        return badges[priority] || badges.Medium;
+    };
+
     const handleStatusUpdate = async (taskId, newStatus) => {
         await updateTaskStatus(taskId, newStatus);
         await fetchTasks();
+        setSelectedEvent(null);
     };
 
-    // Handle task delete
     const handleDeleteTask = async (taskId) => {
         if (window.confirm('Are you sure you want to delete this task?')) {
             await deleteTask(taskId);
@@ -154,441 +216,546 @@ const Calendar = () => {
         }
     };
 
-    // Get status counts
-    const getStatusCounts = () => {
+    const statusCounts = useMemo(() => {
         const counts = { all: events.length, pending: 0, inProgress: 0, completed: 0 };
-        events.forEach(event => {
-            if (event.status === 'Pending') counts.pending++;
-            else if (event.status === 'In Progress') counts.inProgress++;
-            else if (event.status === 'Completed') counts.completed++;
+        events.forEach((e) => {
+            if (e.status === 'Pending') counts.pending++;
+            else if (e.status === 'In Progress') counts.inProgress++;
+            else if (e.status === 'Completed') counts.completed++;
         });
         return counts;
-    };
+    }, [events]);
 
-    const statusCounts = getStatusCounts();
+    const pendingEvents = useMemo(
+        () =>
+            filteredEvents
+                .filter((e) => e.status !== 'Completed')
+                .sort((a, b) => a.fullDate - b.fullDate)
+                .slice(0, 5),
+        [filteredEvents]
+    );
 
-    // Event Modal
-    const EventModal = ({ event, onClose }) => {
-        if (!event) return null;
-
-        return (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                            Task Details
-                        </h3>
-                        <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                            <X className="w-5 h-5 text-slate-500" />
-                        </button>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <h4 className="text-xl font-bold text-slate-800 dark:text-white">{event.title}</h4>
-                            {event.description && (
-                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{event.description}</p>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Status</p>
-                                <span className={`text-sm font-medium px-2 py-1 rounded-full inline-block mt-1 ${getStatusBadge(event.status)}`}>
-                                    {event.status}
-                                </span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Priority</p>
-                                <span className="text-sm font-medium text-slate-800 dark:text-white mt-1 block">
-                                    {event.priority || 'Medium'}
-                                </span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Progress</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                                        <div 
-                                            className="bg-indigo-600 h-1.5 rounded-full"
-                                            style={{ width: `${event.progress || 0}%` }}
-                                        ></div>
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-800 dark:text-white">
-                                        {event.progress || 0}%
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Due Date</p>
-                                <p className="text-sm font-medium text-slate-800 dark:text-white mt-1">
-                                    {event.date} {monthNames[event.month]} {event.year}
-                                </p>
-                            </div>
-                        </div>
-
-                        {event.assignedTo && event.assignedTo.length > 0 && (
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <p className="text-xs text-slate-500 dark:text-slate-400">Assigned To</p>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                    {event.assignedTo.map((user, idx) => (
-                                        <span key={idx} className="text-sm bg-white dark:bg-slate-700 px-2 py-1 rounded-lg">
-                                            {user.fullName || user.name || 'User'}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-                            {event.status !== 'Completed' && (
-                                <>
-                                    <button
-                                        onClick={() => handleStatusUpdate(event.id, 'In Progress')}
-                                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
-                                    >
-                                        Start Progress
-                                    </button>
-                                    <button
-                                        onClick={() => handleStatusUpdate(event.id, 'Completed')}
-                                        className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 transition-colors"
-                                    >
-                                        Complete
-                                    </button>
-                                </>
-                            )}
-                            {event.status === 'Completed' && (
-                                <button
-                                    onClick={() => handleStatusUpdate(event.id, 'Pending')}
-                                    className="flex-1 px-3 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700 transition-colors"
-                                >
-                                    Reopen
-                                </button>
-                            )}
-                            <button
-                                onClick={() => handleDeleteTask(event.id)}
-                                className="px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    // Day detail drawer content (mobile)
+    const mobileDayEvents = selectedDayMobile
+        ? getEventsForDate(selectedDayMobile)
+        : [];
 
     return (
         <>
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">Calendar</h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">
+            <div className="space-y-5 md:space-y-6 pb-8">
+                {/* ===== HEADER ===== */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">
+                            Calendar
+                        </h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                             Manage your tasks and schedule
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button 
+                    <div className="flex items-center gap-2">
+                        <button
                             onClick={fetchTasks}
-                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+                            className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
                         >
                             <CalendarIcon className="w-4 h-4" />
-                            Refresh
+                            <span className="hidden sm:inline">Refresh</span>
                         </button>
-                        <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                        <button className="px-3.5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
                             <Plus className="w-4 h-4" />
-                            Create Task
+                            <span className="hidden sm:inline">Create Task</span>
+                            <span className="sm:hidden">Task</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Status Filters */}
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => setFilterType('all')}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            filterType === 'all'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
-                    >
-                        All ({statusCounts.all})
-                    </button>
-                    <button
-                        onClick={() => setFilterType('Pending')}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            filterType === 'Pending'
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30'
-                        }`}
-                    >
-                        Pending ({statusCounts.pending})
-                    </button>
-                    <button
-                        onClick={() => setFilterType('In Progress')}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            filterType === 'In Progress'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-500/30'
-                        }`}
-                    >
-                        In Progress ({statusCounts.inProgress})
-                    </button>
-                    <button
-                        onClick={() => setFilterType('Completed')}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            filterType === 'Completed'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30'
-                        }`}
-                    >
-                        Completed ({statusCounts.completed})
-                    </button>
+                {/* ===== STATUS FILTERS (horizontal scroll on mobile) ===== */}
+                <div className="-mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto">
+                    <div className="flex gap-2 min-w-max pb-1">
+                        <FilterPill
+                            active={filterType === 'all'}
+                            count={statusCounts.all}
+                            label="All"
+                            activeClass="bg-indigo-600 text-white"
+                            idleClass="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            onClick={() => setFilterType('all')}
+                        />
+                        <FilterPill
+                            active={filterType === 'Pending'}
+                            count={statusCounts.pending}
+                            label="Pending"
+                            activeClass="bg-amber-600 text-white"
+                            idleClass="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-200"
+                            onClick={() => setFilterType('Pending')}
+                        />
+                        <FilterPill
+                            active={filterType === 'In Progress'}
+                            count={statusCounts.inProgress}
+                            label="In Progress"
+                            activeClass="bg-blue-600 text-white"
+                            idleClass="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:bg-blue-200"
+                            onClick={() => setFilterType('In Progress')}
+                        />
+                        <FilterPill
+                            active={filterType === 'Completed'}
+                            count={statusCounts.completed}
+                            label="Completed"
+                            activeClass="bg-emerald-600 text-white"
+                            idleClass="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200"
+                            onClick={() => setFilterType('Completed')}
+                        />
+                    </div>
                 </div>
 
-                {/* Calendar Controls */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                        </button>
-                        <h2 className="text-lg font-semibold text-slate-800 dark:text-white min-w-[150px] text-center">
-                            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                        </h2>
-                        <button 
+                {/* ===== CONTROLS BAR ===== */}
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-3 sm:p-4 space-y-3 sm:space-y-0">
+                    {/* Row 1: navigation */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                            <button
+                                onClick={() =>
+                                    setCurrentMonth(
+                                        new Date(
+                                            currentMonth.getFullYear(),
+                                            currentMonth.getMonth() - 1,
+                                            1
+                                        )
+                                    )
+                                }
+                                aria-label="Previous month"
+                                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                            >
+                                <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                            </button>
+                            <h2 className="text-sm sm:text-lg font-semibold text-slate-800 dark:text-white truncate">
+                                {monthNames[currentMonth.getMonth()]}{' '}
+                                {currentMonth.getFullYear()}
+                            </h2>
+                            <button
+                                onClick={() =>
+                                    setCurrentMonth(
+                                        new Date(
+                                            currentMonth.getFullYear(),
+                                            currentMonth.getMonth() + 1,
+                                            1
+                                        )
+                                    )
+                                }
+                                aria-label="Next month"
+                                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                            >
+                                <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                            </button>
+                        </div>
+                        <button
                             onClick={() => setCurrentMonth(new Date())}
-                            className="px-3 py-1 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            className="px-2.5 py-1.5 text-xs sm:text-sm bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0 font-medium text-slate-700 dark:text-slate-300"
                         >
                             Today
                         </button>
-                        <button 
-                            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                        </button>
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+
+                    {/* Row 2 (sm+) or under (mobile): search + view toggle */}
+                    <div className="flex items-center gap-2 sm:justify-end">
                         <div className="relative flex-1 sm:flex-initial">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input 
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search events..."
-                                className="w-full sm:w-40 pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Search..."
+                                className="w-full sm:w-44 pl-9 pr-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-                            <button 
-                                onClick={() => setView('month')}
-                                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                                    view === 'month' 
-                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400' 
-                                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                            >
-                                Month
-                            </button>
-                            <button 
-                                onClick={() => setView('week')}
-                                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                                    view === 'week' 
-                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400' 
-                                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                            >
-                                Week
-                            </button>
-                            <button 
-                                onClick={() => setView('day')}
-                                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                                    view === 'day' 
-                                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400' 
-                                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                }`}
-                            >
-                                Day
-                            </button>
+                        <div className="shrink-0 flex bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
+                            {['month', 'week', 'day'].map((v) => (
+                                <button
+                                    key={v}
+                                    onClick={() => setView(v)}
+                                    className={`px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-medium transition-colors capitalize ${
+                                        view === v
+                                            ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400'
+                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    <span className="hidden sm:inline capitalize">{v}</span>
+                                    <span className="sm:hidden">{v.charAt(0).toUpperCase()}</span>
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Loading State */}
+                {/* ===== LOADING ===== */}
                 {(isLoading || taskLoading) && (
                     <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                     </div>
                 )}
 
-                {/* Calendar Grid */}
+                {/* ===== CONTENT ===== */}
                 {!isLoading && !taskLoading && (
                     <>
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
-                            {/* Day Names */}
-                            <div className="grid grid-cols-7 border-b border-slate-200/80 dark:border-slate-700/80">
-                                {dayNames.map((day) => (
-                                    <div key={day} className="py-3 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
-                                        {day}
+                        {/* ---------- MONTH VIEW ---------- */}
+                        {view === 'month' && (
+                            <>
+                                {/* DESKTOP / TABLET: 7-col grid */}
+                                <div className="hidden md:block bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+                                    <div className="grid grid-cols-7 border-b border-slate-200/80 dark:border-slate-700/80">
+                                        {dayNames.map((day) => (
+                                            <div
+                                                key={day}
+                                                className="py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider"
+                                            >
+                                                {day}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="grid grid-cols-7">
+                                        {days.map((day, index) => {
+                                            const dayEvents = getEventsForDate(day.date);
+                                            const isToday =
+                                                day.date.toDateString() ===
+                                                new Date().toDateString();
+                                            const hasOverdue = dayEvents.some(isOverdue);
 
-                            {/* Days */}
-                            <div className="grid grid-cols-7">
-                                {days.map((day, index) => {
-                                    const dayEvents = getEventsForDate(day.date);
-                                    const isToday = day.date.toDateString() === new Date().toDateString();
-                                    const hasOverdueTasks = dayEvents.some(e => e.status !== 'Completed' && e.date < new Date().getDate());
-                                    
-                                    return (
-                                        <div 
-                                            key={index} 
-                                            className={`min-h-[120px] p-2 border-r border-b border-slate-200/80 dark:border-slate-700/80 last:border-r-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
-                                                !day.isCurrentMonth ? 'bg-slate-50 dark:bg-slate-800/50' : ''
-                                            }`}
-                                            onClick={() => {
-                                                if (dayEvents.length > 0) {
-                                                    setSelectedEvent(dayEvents[0]);
-                                                }
-                                            }}
-                                        >
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className={`text-sm font-medium ${
-                                                    isToday 
-                                                        ? 'w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-full' 
-                                                        : day.isCurrentMonth 
-                                                            ? 'text-slate-700 dark:text-slate-300' 
-                                                            : 'text-slate-400 dark:text-slate-600'
-                                                }`}>
-                                                    {day.date.getDate()}
-                                                </span>
-                                                {dayEvents.length > 0 && (
-                                                    <span className="text-xs text-slate-400">{dayEvents.length}</span>
-                                                )}
-                                                {hasOverdueTasks && (
-                                                    <AlertCircle className="w-3 h-3 text-red-500" />
-                                                )}
-                                            </div>
-                                            <div className="space-y-1">
-                                                {dayEvents.slice(0, 3).map((event) => (
-                                                    <div 
-                                                        key={event.id}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedEvent(event);
-                                                        }}
-                                                        className={`text-xs px-2 py-1 rounded ${getColorClass(event.color)} truncate cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
-                                                    >
-                                                        {event.status === 'Completed' && (
-                                                            <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    className={`min-h-[110px] lg:min-h-[130px] p-2 border-r border-b border-slate-200/80 dark:border-slate-700/80 [&:nth-child(7n)]:border-r-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
+                                                        !day.isCurrentMonth
+                                                            ? 'bg-slate-50/50 dark:bg-slate-800/30'
+                                                            : ''
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (dayEvents.length > 0)
+                                                            setSelectedEvent(dayEvents[0]);
+                                                    }}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span
+                                                            className={`text-sm font-medium ${
+                                                                isToday
+                                                                    ? 'w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-full'
+                                                                    : day.isCurrentMonth
+                                                                    ? 'text-slate-700 dark:text-slate-300'
+                                                                    : 'text-slate-400 dark:text-slate-600'
+                                                            }`}
+                                                        >
+                                                            {day.date.getDate()}
+                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            {hasOverdue && (
+                                                                <AlertCircle className="w-3 h-3 text-red-500" />
+                                                            )}
+                                                            {dayEvents.length > 0 && (
+                                                                <span className="text-[10px] text-slate-400 font-medium">
+                                                                    {dayEvents.length}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {dayEvents.slice(0, 2).map((event) => (
+                                                            <div
+                                                                key={event.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedEvent(event);
+                                                                }}
+                                                                className={`text-[11px] px-1.5 py-0.5 rounded ${getColorClass(
+                                                                    event.color
+                                                                )} truncate cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
+                                                            >
+                                                                {event.status === 'Completed' && (
+                                                                    <CheckCircle className="w-2.5 h-2.5 flex-shrink-0" />
+                                                                )}
+                                                                <span className="truncate">
+                                                                    {event.title}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {dayEvents.length > 2 && (
+                                                            <div className="text-[10px] text-slate-400 px-1.5">
+                                                                +{dayEvents.length - 2} more
+                                                            </div>
                                                         )}
-                                                        <span className="font-medium">{event.time}</span>
-                                                        <span className="truncate">{event.title}</span>
                                                     </div>
-                                                ))}
-                                                {dayEvents.length > 3 && (
-                                                    <div className="text-xs text-slate-400 px-2">
-                                                        +{dayEvents.length - 3} more
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
 
-                        {/* Upcoming Events */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
+                                {/* MOBILE: compact month + day drawer */}
+                                <div className="md:hidden bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+                                    {/* Compact month header */}
+                                    <div className="grid grid-cols-7 border-b border-slate-200/80 dark:border-slate-700/80">
+                                        {dayNames.map((d) => (
+                                            <div
+                                                key={d}
+                                                className="py-2 text-center text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase"
+                                            >
+                                                {d.charAt(0)}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Compact day cells */}
+                                    <div className="grid grid-cols-7">
+                                        {days.map((day, index) => {
+                                            const dayEvents = getEventsForDate(day.date);
+                                            const isToday =
+                                                day.date.toDateString() ===
+                                                new Date().toDateString();
+                                            const hasOverdue = dayEvents.some(isOverdue);
+                                            const isSelected =
+                                                selectedDayMobile &&
+                                                day.date.toDateString() ===
+                                                    selectedDayMobile.toDateString();
+                                            const hasEvents = dayEvents.length > 0;
+
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    onClick={() =>
+                                                        setSelectedDayMobile(
+                                                            isSelected ? null : day.date
+                                                        )
+                                                    }
+                                                    className={`relative aspect-square flex flex-col items-center justify-center transition-colors border-b border-r border-slate-100 dark:border-slate-800 [&:nth-child(7n)]:border-r-0 ${
+                                                        isSelected
+                                                            ? 'bg-indigo-50 dark:bg-indigo-500/10'
+                                                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                                    } ${
+                                                        !day.isCurrentMonth
+                                                            ? 'opacity-40'
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`text-sm font-medium ${
+                                                            isToday
+                                                                ? 'w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-full'
+                                                                : 'text-slate-700 dark:text-slate-300'
+                                                        }`}
+                                                    >
+                                                        {day.date.getDate()}
+                                                    </span>
+
+                                                    {/* Event dots */}
+                                                    {hasEvents && (
+                                                        <div className="absolute bottom-1.5 flex items-center gap-0.5">
+                                                            {dayEvents.slice(0, 3).map((event, i) => (
+                                                                <span
+                                                                    key={i}
+                                                                    className={`w-1 h-1 rounded-full ${getColorBar(
+                                                                        event.color
+                                                                    )}`}
+                                                                />
+                                                            ))}
+                                                            {dayEvents.length > 3 && (
+                                                                <span className="text-[8px] text-slate-400 ml-0.5">
+                                                                    +
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {hasOverdue && (
+                                                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Day drawer */}
+                                    {selectedDayMobile && (
+                                        <div className="border-t border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-800/50">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                                    {selectedDayMobile.toLocaleDateString(
+                                                        undefined,
+                                                        {
+                                                            weekday: 'long',
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                        }
+                                                    )}
+                                                </p>
+                                                <button
+                                                    onClick={() => setSelectedDayMobile(null)}
+                                                    aria-label="Close"
+                                                    className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                                                >
+                                                    <X className="w-3.5 h-3.5 text-slate-400" />
+                                                </button>
+                                            </div>
+
+                                            {mobileDayEvents.length > 0 ? (
+                                                <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                                                    {mobileDayEvents.map((event) => (
+                                                        <li key={event.id}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedEvent(event);
+                                                                    setSelectedDayMobile(null);
+                                                                }}
+                                                                className="w-full text-left flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                            >
+                                                                <span
+                                                                    className={`w-1 h-8 rounded-full ${getColorBar(
+                                                                        event.color
+                                                                    )} shrink-0`}
+                                                                />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-xs font-medium text-slate-800 dark:text-white truncate">
+                                                                        {event.title}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                                                        {event.time} · {event.status}
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-xs text-slate-400 text-center py-3">
+                                                    No events on this day
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        {/* ---------- WEEK VIEW ---------- */}
+                        {view === 'week' && (
+                            <WeekView
+                                currentMonth={currentMonth}
+                                filteredEvents={filteredEvents}
+                                setSelectedEvent={setSelectedEvent}
+                                getColorBar={getColorBar}
+                                getColorClass={getColorClass}
+                                isOverdue={isOverdue}
+                            />
+                        )}
+
+                        {/* ---------- DAY VIEW ---------- */}
+                        {view === 'day' && (
+                            <DayView
+                                selectedDate={selectedDayMobile || new Date()}
+                                events={getEventsForDate(selectedDayMobile || new Date())}
+                                setSelectedEvent={setSelectedEvent}
+                                getColorBar={getColorBar}
+                            />
+                        )}
+
+                        {/* ---------- UPCOMING TASKS ---------- */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 sm:p-5">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Clock className="w-5 h-5" />
+                                    <Clock className="w-5 h-5 text-indigo-500" />
                                     Upcoming Tasks
                                     <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                                        ({filteredEvents.filter(e => e.status !== 'Completed').length} pending)
+                                        ({pendingEvents.length})
                                     </span>
                                 </h3>
                             </div>
-                            <div className="space-y-3">
-                                {filteredEvents
-                                    .filter(event => event.status !== 'Completed')
-                                    .sort((a, b) => a.date - b.date)
-                                    .slice(0, 5)
-                                    .map((event) => (
-                                        <div 
-                                            key={event.id} 
+
+                            {pendingEvents.length === 0 ? (
+                                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                                    <CheckCircle className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
+                                    <p className="text-sm">All caught up! 🎉</p>
+                                    <p className="text-xs mt-1">No pending tasks</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {pendingEvents.map((event) => (
+                                        <button
+                                            key={event.id}
                                             onClick={() => setSelectedEvent(event)}
-                                            className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                                            className="w-full text-left flex items-center gap-3 sm:gap-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                         >
-                                            <div className={`w-1 h-12 rounded-full ${
-                                                event.color === 'indigo' ? 'bg-indigo-500' :
-                                                event.color === 'purple' ? 'bg-purple-500' :
-                                                event.color === 'emerald' ? 'bg-emerald-500' :
-                                                event.color === 'blue' ? 'bg-blue-500' :
-                                                event.color === 'red' ? 'bg-red-500' :
-                                                'bg-orange-500'
-                                            }`}></div>
+                                            <div
+                                                className={`w-1 h-12 rounded-full shrink-0 ${getColorBar(
+                                                    event.color
+                                                )}`}
+                                            />
+
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-slate-800 dark:text-white truncate">
+                                                <p className="font-medium text-sm text-slate-800 dark:text-white truncate">
                                                     {event.title}
                                                 </p>
-                                                <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="w-4 h-4" />
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        <Clock className="w-3 h-3" />
                                                         {event.time}
                                                     </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <CalendarIcon className="w-4 h-4" />
-                                                        {monthNames[event.month]} {event.date}, {event.year}
+                                                    <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        <CalendarIcon className="w-3 h-3" />
+                                                        <span className="hidden sm:inline">
+                                                            {monthNames[event.month]}{' '}
+                                                            {event.date}, {event.year}
+                                                        </span>
+                                                        <span className="sm:hidden">
+                                                            {monthNames[event.month].slice(0, 3)}{' '}
+                                                            {event.date}
+                                                        </span>
                                                     </span>
-                                                    <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusBadge(event.status)}`}>
+                                                    <span
+                                                        className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${getStatusBadge(
+                                                            event.status
+                                                        )}`}
+                                                    >
                                                         {event.status}
                                                     </span>
                                                     {event.priority && (
-                                                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                                            event.priority === 'High' ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400' :
-                                                            event.priority === 'Medium' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400' :
-                                                            'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                                                        }`}>
+                                                        <span
+                                                            className={`hidden sm:inline px-2 py-0.5 text-[10px] font-medium rounded-full ${getPriorityBadge(
+                                                                event.priority
+                                                            )}`}
+                                                        >
                                                             {event.priority}
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="w-16">
+
+                                            <div className="hidden sm:block w-16 shrink-0">
                                                 <div className="bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                                                    <div 
-                                                        className="bg-indigo-600 h-1.5 rounded-full"
-                                                        style={{ width: `${event.progress || 0}%` }}
-                                                    ></div>
+                                                    <div
+                                                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-1.5 rounded-full transition-all"
+                                                        style={{
+                                                            width: `${event.progress || 0}%`,
+                                                        }}
+                                                    />
                                                 </div>
-                                                <p className="text-xs text-slate-400 text-center mt-1">
+                                                <p className="text-[10px] text-slate-400 text-center mt-1 tabular-nums">
                                                     {event.progress || 0}%
                                                 </p>
                                             </div>
-                                        </div>
+                                        </button>
                                     ))}
-                                {filteredEvents.filter(e => e.status !== 'Completed').length === 0 && (
-                                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                                        <p>No pending tasks</p>
-                                        <p className="text-sm mt-1">All tasks are completed! 🎉</p>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
 
-                {/* Event Modal */}
+                {/* ===== EVENT MODAL ===== */}
                 {selectedEvent && (
-                    <EventModal 
-                        event={selectedEvent} 
-                        onClose={() => setSelectedEvent(null)} 
+                    <EventModal
+                        event={selectedEvent}
+                        onClose={() => setSelectedEvent(null)}
+                        onStatusUpdate={handleStatusUpdate}
+                        onDelete={handleDeleteTask}
+                        getStatusBadge={getStatusBadge}
+                        getPriorityBadge={getPriorityBadge}
+                        monthNames={monthNames}
                     />
                 )}
             </div>
@@ -597,3 +764,374 @@ const Calendar = () => {
 };
 
 export default Calendar;
+
+/* ============================================================
+   SUB-COMPONENTS
+   ============================================================ */
+
+const FilterPill = ({ active, count, label, activeClass, idleClass, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+            active ? activeClass : idleClass
+        }`}
+    >
+        {label} ({count})
+    </button>
+);
+
+const EventModal = ({
+    event,
+    onClose,
+    onStatusUpdate,
+    onDelete,
+    getStatusBadge,
+    getPriorityBadge,
+    monthNames,
+}) => {
+    if (!event) return null;
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200/50 dark:border-slate-700/50 my-8"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-700/80 px-5 py-4 flex items-start justify-between rounded-t-2xl z-10">
+                    <div className="min-w-0 flex-1 pr-3">
+                        <p className="text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-400 mb-1">
+                            Task
+                        </p>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white break-words">
+                            {event.title}
+                        </h3>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="shrink-0 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <X className="w-5 h-5 text-slate-500" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {event.description && (
+                        <div>
+                            <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                                Description
+                            </p>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                                {event.description}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <InfoTile label="Status">
+                            <span
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${getStatusBadge(
+                                    event.status
+                                )}`}
+                            >
+                                {event.status}
+                            </span>
+                        </InfoTile>
+                        <InfoTile label="Priority">
+                            <span
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${getPriorityBadge(
+                                    event.priority
+                                )}`}
+                            >
+                                {event.priority || 'Medium'}
+                            </span>
+                        </InfoTile>
+                        <InfoTile label="Due Date" full>
+                            <p className="text-sm font-medium text-slate-800 dark:text-white">
+                                {monthNames[event.month]} {event.date}, {event.year}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                {event.time}
+                            </p>
+                        </InfoTile>
+                    </div>
+
+                    {/* Progress */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400">
+                                Progress
+                            </span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                                {event.progress || 0}%
+                            </span>
+                        </div>
+                        <div className="bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                            <div
+                                className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all"
+                                style={{ width: `${event.progress || 0}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Assignees */}
+                    {event.assignedTo?.length > 0 && (
+                        <div>
+                            <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                                Assigned To ({event.assignedTo.length})
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {event.assignedTo.map((user, idx) => (
+                                    <span
+                                        key={idx}
+                                        className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-lg"
+                                    >
+                                        {user.fullName || user.name || 'User'}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="border-t border-slate-200/80 dark:border-slate-700/80 p-4 flex items-center gap-2">
+                    {event.status !== 'Completed' ? (
+                        <>
+                            {event.status === 'Pending' && (
+                                <button
+                                    onClick={() =>
+                                        onStatusUpdate(event.id, 'In Progress')
+                                    }
+                                    className="flex-1 px-3 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                >
+                                    Start
+                                </button>
+                            )}
+                            <button
+                                onClick={() =>
+                                    onStatusUpdate(event.id, 'Completed')
+                                }
+                                className="flex-1 px-3 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                            >
+                                Complete
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => onStatusUpdate(event.id, 'Pending')}
+                            className="flex-1 px-3 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                        >
+                            Reopen
+                        </button>
+                    )}
+                    <button
+                        onClick={() => onDelete(event.id)}
+                        aria-label="Delete task"
+                        className="p-2.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors shrink-0"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const InfoTile = ({ label, children, full = false }) => (
+    <div
+        className={`p-3 bg-slate-50 dark:bg-slate-800 rounded-lg ${
+            full ? 'col-span-2' : ''
+        }`}
+    >
+        <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400 mb-1">
+            {label}
+        </p>
+        {children}
+    </div>
+);
+
+/* ---------- WEEK VIEW ---------- */
+const WeekView = ({
+    currentMonth,
+    filteredEvents,
+    setSelectedEvent,
+    getColorBar,
+    getColorClass,
+    isOverdue,
+}) => {
+    const [weekOffset, setWeekOffset] = useState(0);
+
+    const startOfWeek = useMemo(() => {
+        const d = new Date(currentMonth);
+        d.setDate(d.getDate() - d.getDay() + weekOffset * 7);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }, [currentMonth, weekOffset]);
+
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(startOfWeek);
+        d.setDate(d.getDate() + i);
+        return d;
+    });
+
+    const getEventsForDate = (date) =>
+        filteredEvents.filter(
+            (e) =>
+                e.date === date.getDate() &&
+                e.month === date.getMonth() &&
+                e.year === date.getFullYear()
+        );
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+            <div className="flex items-center justify-between p-3 border-b border-slate-200/80 dark:border-slate-700/80">
+                <button
+                    onClick={() => setWeekOffset((o) => o - 1)}
+                    aria-label="Previous week"
+                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                </button>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {startOfWeek.toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                    })}{' '}
+                    –{' '}
+                    {weekDays[6].toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                    })}
+                </span>
+                <button
+                    onClick={() => setWeekOffset((o) => o + 1)}
+                    aria-label="Next week"
+                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {weekDays.map((day) => {
+                    const dayEvents = getEventsForDate(day);
+                    const isToday = day.toDateString() === new Date().toDateString();
+                    const hasOverdue = dayEvents.some(isOverdue);
+
+                    return (
+                        <div key={day.toISOString()} className="p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span
+                                    className={`text-sm font-semibold ${
+                                        isToday
+                                            ? 'w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-full'
+                                            : 'text-slate-700 dark:text-slate-300'
+                                    }`}
+                                >
+                                    {day.getDate()}
+                                </span>
+                                <span className="text-xs uppercase tracking-wide font-medium text-slate-500 dark:text-slate-400">
+                                    {day.toLocaleDateString(undefined, {
+                                        weekday: 'short',
+                                    })}
+                                </span>
+                                {hasOverdue && (
+                                    <AlertCircle className="w-3.5 h-3.5 text-red-500 ml-auto" />
+                                )}
+                            </div>
+
+                            {dayEvents.length > 0 ? (
+                                <div className="space-y-1.5">
+                                    {dayEvents.map((event) => (
+                                        <button
+                                            key={event.id}
+                                            onClick={() => setSelectedEvent(event)}
+                                            className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg ${getColorClass(
+                                                event.color
+                                            )} hover:opacity-80 transition-opacity`}
+                                        >
+                                            <span className="text-[11px] font-semibold shrink-0">
+                                                {event.time}
+                                            </span>
+                                            <span className="text-xs truncate flex-1">
+                                                {event.title}
+                                            </span>
+                                            {event.status === 'Completed' && (
+                                                <CheckCircle className="w-3 h-3 shrink-0" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                                    No events
+                                </p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+/* ---------- DAY VIEW ---------- */
+const DayView = ({ selectedDate, events, setSelectedEvent, getColorBar }) => {
+    const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+            <div className="p-4 border-b border-slate-200/80 dark:border-slate-700/80">
+                <p className="text-xs uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400">
+                    {isToday ? 'Today' : 'Selected day'}
+                </p>
+                <p className="text-lg font-semibold text-slate-800 dark:text-white mt-0.5">
+                    {selectedDate.toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                    })}
+                </p>
+            </div>
+
+            {events.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {events.map((event) => (
+                        <button
+                            key={event.id}
+                            onClick={() => setSelectedEvent(event)}
+                            className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        >
+                            <div
+                                className={`w-1 h-12 rounded-full shrink-0 ${getColorBar(
+                                    event.color
+                                )}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-slate-800 dark:text-white truncate">
+                                    {event.title}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    {event.time} · {event.status}
+                                </p>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-12 px-4 text-slate-500 dark:text-slate-400">
+                    <ListTodo className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                    <p className="text-sm">No events on this day</p>
+                </div>
+            )}
+        </div>
+    );
+};

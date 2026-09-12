@@ -17,11 +17,14 @@ import {
     Line, Area, AreaChart, Legend, ComposedChart,
     RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
+    const [dashboardData, setDashboardData] = useState()
+    const navigate = useNavigate()
     
     // Initialize with default empty data to ensure charts render immediately
     const [statusData, setStatusData] = useState([
@@ -43,18 +46,10 @@ const Dashboard = () => {
         { day: 'Sat', tasks: 6, completed: 4 },
         { day: 'Sun', tasks: 4, completed: 3 }
     ]);
-    const [performanceData] = useState([
-        { subject: 'Productivity', A: 85, fullMark: 100 },
-        { subject: 'Quality', A: 90, fullMark: 100 },
-        { subject: 'Speed', A: 75, fullMark: 100 },
-        { subject: 'Collaboration', A: 88, fullMark: 100 },
-        { subject: 'Innovation', A: 70, fullMark: 100 },
-        { subject: 'Reliability', A: 92, fullMark: 100 }
-    ]);
     const [animated, setAnimated] = useState(false);
 
     const { authUser } = useAuth();
-    const { tasks, getTasks, getTaskStatistics, loading: taskLoading } = useTask();
+    const { tasks, getTasks, getTaskStatistics, loading: taskLoading, getUserDashboardData, getDashboardData } = useTask();
     const { teams, fetchTeams, loading: teamLoading } = useTeam();
 
     const chartRef = useRef(null);
@@ -76,7 +71,8 @@ const Dashboard = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                await Promise.all([getTasks(), fetchTeams()]);
+                const [allTasks, allTeams, dashboardData] = await Promise.all([getTasks(), fetchTeams(), getUserDashboardData()]);
+                setDashboardData(dashboardData)
             } catch (error) {
                 console.error('Error fetching dashboard data:', error);
             } finally {
@@ -86,44 +82,41 @@ const Dashboard = () => {
         loadData();
         setTimeout(() => setAnimated(true), 300);
     }, []);
-
     // 2. Calculate stats safely when `tasks` array actually updates in context
     useEffect(() => {
         if (!tasks || tasks.length === 0) return;
 
-        const taskStats = getTaskStatistics(tasks) || {};
-
+        const taskStats = dashboardData?.charts || {};
+        console.log(dashboardData);
+        
         // Update stats cards
         setStats([
-            { icon: ListTodo, label: 'Total Tasks', value: taskStats.total?.toString() || '0', change: '+12.5%', positive: true, color: 'indigo' },
-            { icon: CheckCircle, label: 'Completed', value: taskStats.completed?.toString() || '0', change: '+8.2%', positive: true, color: 'emerald' },
-            { icon: Users, label: 'Team Members', value: teams.reduce((acc, team) => acc + (team.members?.length || 0), 0).toString(), change: '+3.1%', positive: true, color: 'purple' },
-            { icon: MessageSquare, label: 'Messages', value: '1,293', change: '-2.4%', positive: false, color: 'orange' },
+            { icon: ListTodo, label: 'Total Tasks', value: dashboardData?.trends?.totalTasks?.current || '0', change: `+${dashboardData?.trends?.totalTasks?.change}%`, positive: dashboardData?.trends?.totalTasks?.current > 0 ? true : false, color: 'indigo' },
+            { icon: CheckCircle, label: 'Completed', value: dashboardData?.trends?.completedTasks?.current || '0', change: `+${dashboardData?.trends?.completedTasks?.change}%`, positive: dashboardData?.trends?.completedTasks?.current > 0 ? true : false, color: 'emerald' },
+            { icon: Users, label: 'Teams', value: dashboardData?.trends?.users?.current || '0', change: `+${dashboardData?.trends?.users?.change}%`, positive: dashboardData?.trends?.users?.current > 0 ? true : false, color: 'purple' },
+            { icon: MessageSquare, label: 'Messages', value: dashboardData?.trends?.messages?.current || '0', change: `+${dashboardData?.trends?.messages?.change}%`, positive: dashboardData?.trends?.messages?.current > 0 ? true : false, color: 'orange' },
         ]);
 
         // Update chart data
         setStatusData([
-            { name: 'Pending', value: taskStats.pending || 0 },
-            { name: 'In Progress', value: taskStats.inProgress || 0 },
-            { name: 'Completed', value: taskStats.completed || 0 }
+            { name: 'Pending', value: taskStats?.taskDistribution?.Pending || 0 },
+            { name: 'In Progress', value: taskStats?.taskDistribution?.InProgress || 0 },
+            { name: 'Completed', value: taskStats?.taskDistribution?.Completed || 0 }
         ]);
 
         setPriorityData([
-            { name: 'High', value: taskStats.priorityBreakdown?.high || 0 },
-            { name: 'Medium', value: taskStats.priorityBreakdown?.medium || 0 },
-            { name: 'Low', value: taskStats.priorityBreakdown?.low || 0 }
+            { name: 'High', value: taskStats?.taskPriorityLevels?.High || 0 },
+            { name: 'Medium', value: taskStats?.taskPriorityLevels?.Medium || 0 },
+            { name: 'Low', value: taskStats?.taskPriorityLevels?.Low || 0 }
         ]);
-
-        // Update recent activity
-        const recent = tasks.slice(0, 5).map(task => ({
-            user: task.createdBy?.fullName || 'System',
-            action: `created a new task: "${task.title}"`,
-            time: new Date(task.createdAt).toLocaleDateString(),
-            project: task.title
-        }));
-        setRecentActivity(recent);
-
     }, [tasks, teams, getTaskStatistics]);
+    
+    const [performanceData] = useState([
+        { subject: 'Total', A: dashboardData?.statistics?.totalTasks, fullMark: 10 },
+        { subject: 'Completed', A: dashboardData?.statistics?.completedTasks, fullMark: 10 },
+        { subject: 'Overdue', A: dashboardData?.statistics?.overdueTasks, fullMark: 10 },
+        { subject: 'Pending', A: dashboardData?.statistics?.pendingTasks, fullMark: 10 }
+    ]);
 
     const isAdmin = authUser?.role === 'admin';
 
@@ -176,8 +169,8 @@ const Dashboard = () => {
                         </div>
                         <p className="text-slate-500 dark:text-slate-400 mt-1">
                             {isAdmin 
-                                ? 'Here\'s your team\'s performance overview.'
-                                : 'Here\'s what\'s happening with your tasks today.'
+                                ? 'Here\'s your team\'s performance last week overview.'
+                                : 'Here\'s what\'s happening with your tasks today and last week overview.'
                             }
                         </p>
                     </div>
@@ -232,7 +225,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Status Distribution - Pie Chart */}
                     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
                         <div className="flex items-center justify-between mb-4">
@@ -318,20 +311,20 @@ const Dashboard = () => {
                     </div>
 
                     {/* Performance Radar */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
-                        <div className="flex items-center justify-between mb-4">
+                    {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5"> */}
+                        {/* <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
                                 <Target className="w-5 h-5 text-emerald-500" />
                                 Performance
                             </h3>
                             <span className="text-xs text-slate-400">Metrics</span>
-                        </div>
-                        <div className="h-64">
+                        </div> */}
+                        {/* <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadarChart data={performanceData}>
                                     <PolarGrid stroke="#e2e8f0" />
                                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-                                    <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 10]} />
                                     <Radar
                                         name="Performance"
                                         dataKey="A"
@@ -344,12 +337,12 @@ const Dashboard = () => {
                                     <Tooltip content={<CustomTooltip />} />
                                 </RadarChart>
                             </ResponsiveContainer>
-                        </div>
-                    </div>
+                        </div> */}
+                    {/* </div> */}
                 </div>
 
                 {/* Activity and Quick Actions */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Activity Feed */}
                     <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
@@ -357,14 +350,14 @@ const Dashboard = () => {
                                 <Clock className="w-5 h-5 text-indigo-500" />
                                 Recent Activity
                             </h3>
-                            <button className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                            <button className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1" onClick={() => navigate('/team', { state: { scrollTo: 'team_tasks' } })}>
                                 View all
                                 <ArrowUp className="w-4 h-4 rotate-45" />
                             </button>
                         </div>
                         <div className="space-y-4">
-                            {recentActivity.length > 0 ? (
-                                recentActivity.map((activity, index) => (
+                            {dashboardData?.recentTasks.length > 0 ? (
+                                dashboardData?.recentTasks.map((task, index) => (
                                     <div 
                                         key={index} 
                                         className={`flex items-start gap-3 pb-4 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0 transition-all duration-300 ${
@@ -372,20 +365,17 @@ const Dashboard = () => {
                                         }`}
                                         style={{ transitionDelay: `${index * 100 + 500}ms` }}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
-                                            {activity.user.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                        <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs shrink-0">
+                                            {task.createdBy?.fullName || 'System'.split(' ').map(n => n[0]).join('').toUpperCase()}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm text-slate-700 dark:text-slate-300">
-                                                <span className="font-semibold">{activity.user}</span>
-                                                {' '}{activity.action}
-                                                <span className="text-indigo-600 dark:text-indigo-400"> {activity.project}</span>
+                                                <span className="font-semibold">{task.createdBy?.fullName || 'System'}</span>
+                                                {' '}{`created a new task: `}
+                                                <span className="text-indigo-600 dark:text-indigo-400"> {task.title}</span>
                                             </p>
-                                            <p className="text-xs text-slate-400 mt-1">{activity.time}</p>
+                                            <p className="text-xs text-slate-400 mt-1">{new Date(task.createdAt).toLocaleDateString()}</p>
                                         </div>
-                                        <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                                            <Eye className="w-4 h-4" />
-                                        </button>
                                     </div>
                                 ))
                             ) : (
@@ -398,7 +388,7 @@ const Dashboard = () => {
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm">
+                    {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm">
                         <h3 className="font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                             <Zap className="w-5 h-5 text-amber-500" />
                             Quick Actions
@@ -441,7 +431,7 @@ const Dashboard = () => {
                                 </div>
                             </button>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* Team Stats (Admin only) */}

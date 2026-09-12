@@ -7,7 +7,10 @@ import {
     Users, MoreHorizontal, Flag, Star,
     CheckCircle, Circle, AlertCircle, 
     MessageSquare, Paperclip, Link2,
-    Eye, EyeOff, Zap, Sparkles, Loader2
+    Eye, EyeOff, Zap, Sparkles, Loader2,
+    TrendingUp,
+    TrendingDown,
+    TrendingUpDown
 } from 'lucide-react';
 import TodoCheckLists from './TodoCheckLists';
 
@@ -161,16 +164,16 @@ const TaskCard = ({
         switch(priority) {
             case 'High': return 'text-red-500 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20';
             case 'Medium': return 'text-amber-500 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20';
-            case 'Low': return 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
+            case 'Low': return 'text-blue-500 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20';
             default: return 'text-slate-500 bg-slate-50 dark:bg-slate-500/10';
         }
     };
 
     const getPriorityIcon = (priority) => {
         switch(priority) {
-            case 'High': return <Flag className="w-3.5 h-3.5" />;
-            case 'Medium': return <Clock className="w-3.5 h-3.5" />;
-            case 'Low': return <CheckCircle className="w-3.5 h-3.5" />;
+            case 'High': return <TrendingUp className="w-3.5 h-3.5" />;
+            case 'Medium': return <TrendingUpDown className="w-3.5 h-3.5" />;
+            case 'Low': return <TrendingDown className="w-3.5 h-3.5" />;
             default: return null;
         }
     };
@@ -188,7 +191,7 @@ const TaskCard = ({
         switch(status) {
             case 'Completed': return <CheckCircle className="w-3.5 h-3.5" />;
             case 'In Progress': return <Zap className="w-3.5 h-3.5" />;
-            case 'Pending': return <Circle className="w-3.5 h-3.5" />;
+            case 'Pending': return <Clock className="w-3.5 h-3.5" />;
             default: return null;
         }
     };
@@ -362,21 +365,6 @@ const handleTodoToggle = async (todoIndex) => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
-                    {/* Quick Complete Button - Only for assigned members */}
-                    {!isComplete && canMarkComplete && (
-                        <button
-                            onClick={handleTaskComplete}
-                            disabled={isUpdating}
-                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-                            title="Mark all as complete"
-                        >
-                            {isUpdating ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Check className="w-4 h-4" />
-                            )}
-                        </button>
-                    )}
                     
                     {/* Edit Button - Only for assigned members or admin */}
                     {canEdit && (
@@ -449,153 +437,6 @@ const handleTodoToggle = async (todoIndex) => {
                     </span>
                 </div>
             </div>
-
-            {/* ============================================================
-                EXPANDED SECTION - Member Checkboxes
-                ============================================================ */}
-            {isExpanded && task.todoChecklist && task.todoChecklist.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3 animate-slideDown">
-                    {/* Member Progress */}
-                    <div>
-                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
-                            <Users className="w-3.5 h-3.5" />
-                            Members Progress
-                        </p>
-                        <div className="space-y-2">
-                            {task.assignedTo.map((memberId) => {
-                                // ✅ Use memberId as key (string conversion)
-                                const memberKey = memberId?.toString() || 'unknown';
-                                const name = getMemberName(memberId);
-                                const avatar = getMemberAvatar(memberId);
-                                const isCompleted = localCompletedBy?.includes(memberId);
-                                const isCurrentUser = memberId?.toString() === currentUser?._id?.toString();
-                                
-                                // ✅ Only assigned members or admin can toggle
-                                const canToggle = canMarkComplete && (isCurrentUser || isAdmin);
-
-                                return (
-                                    <div
-                                        key={memberKey}
-                                        className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
-                                            isCompleted 
-                                                ? 'bg-emerald-50 dark:bg-emerald-500/10' 
-                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                        }`}
-                                    >
-                                        {/* ✅ Checkbox for completion */}
-                                        <div className="relative flex-shrink-0">
-                                            <input
-                                                type="checkbox"
-                                                checked={isCompleted || false}
-                                                onChange={() => handleMemberToggle(memberId)}
-                                                disabled={!canToggle || isUpdating}
-                                                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                            />
-                                        </div>
-
-                                        <div className="relative flex-shrink-0">
-                                            {avatar ? (
-                                                <img 
-                                                    src={avatar} 
-                                                    alt={name}
-                                                    className="w-8 h-8 rounded-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                                                    isCompleted 
-                                                        ? 'bg-emerald-500 text-white' 
-                                                        : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
-                                                }`}>
-                                                    {getMemberInitials(memberId)}
-                                                </div>
-                                            )}
-                                            {isCompleted && (
-                                                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
-                                                    <Check className="w-2.5 h-2.5 text-white" />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-medium ${
-                                                isCompleted 
-                                                    ? 'text-slate-400 dark:text-slate-500 line-through' 
-                                                    : 'text-slate-700 dark:text-slate-300'
-                                            }`}>
-                                                {name}
-                                                {isCurrentUser && (
-                                                    <span className="text-xs text-indigo-500 ml-1 font-normal">(You)</span>
-                                                )}
-                                            </p>
-                                        </div>
-
-                                        {/* Status indicator */}
-                                        <div className="flex items-center gap-1">
-                                            {isCompleted ? (
-                                                <span className="text-xs text-emerald-500 font-medium flex items-center gap-0.5">
-                                                    <Check className="w-3 h-3" />
-                                                    Done
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-slate-400">
-                                                    Pending
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {task?.todoChecklist?.map((item, index) => (
-                            <TodoCheckLists
-                            key={`todo_${index}`}
-                            text={item.text}
-                            isChecked={item?.completed}
-                            onChange={() => updateTodoChecklist(index)} />
-                        ))}
-                    </div>
-                    
-                    {/* Task Description */}
-                    {task.description && (
-                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                            <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
-                                {task.description}
-                            </p>
-                        </div>
-                    )}
-                    
-                    {/* Due Date */}
-                    {task.dueDate && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ============================================================
-                EXPAND TOGGLE
-                ============================================================ */}
-            {task.assignedTo && task.assignedTo.length > 0 && (
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                >
-                    {isExpanded ? (
-                        <>
-                            <ChevronUp className="w-3.5 h-3.5" />
-                            Show less
-                        </>
-                    ) : (
-                        <>
-                            <ChevronDown className="w-3.5 h-3.5" />
-                            Show details
-                        </>
-                    )}
-                </button>
-            )}
 
             {/* ============================================================
                 PERMISSION INDICATOR

@@ -22,6 +22,7 @@ import { useTask } from '../context/TaskContext';
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { useSocket } from '../hooks/useSocket';
 
 import TeamFiles from '../components/TeamFiles';
 import TeamFileList from '../components/TeamFileList';
@@ -182,6 +183,16 @@ const handleFileDeleted = (fileId) => {
         
         loadTeams();
     }, [authUser, token]);
+    
+    const { socket } = useSocket(authUser?._id);
+    const [onlineUsers, setOnlineUsers] = useState([]);
+
+    useEffect(() => {
+        if (!socket) return;
+        const onOnline = (users) => setOnlineUsers(users || []);
+        socket.on('getOnlineUsers', onOnline);
+        return () => socket.off('getOnlineUsers', onOnline);
+    }, [socket]);
 
     const privateTeams = teams.filter(team => team.isPrivate && team.createdBy === authUser._id);
     console.log("private", privateTeams);
@@ -1387,27 +1398,27 @@ const handleFileDeleted = (fileId) => {
                         </div>
 
                         {/* Team Stats */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Total Members</p>
                                 <p className="text-2xl font-bold text-slate-800 dark:text-white">
                                     {selectedTeam.members?.length || 0}
                                 </p>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
+                            {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Projects</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">0</p>
-                            </div>
+                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{teamTasks.length}</p>
+                            </div> */}
                             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Tasks</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">0</p>
+                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{teamTasks.length}</p>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
+                            {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Online</p>
                                 <p className="text-2xl font-bold text-emerald-500">
                                     {selectedTeam.members?.filter(m => m.isOnline).length || 0}
                                 </p>
-                            </div>
+                            </div> */}
                         </div>
 
                         {/* Members List */}
@@ -1445,7 +1456,7 @@ const handleFileDeleted = (fileId) => {
                                         const memberName = member.fullName || member.name || 'Unknown';
                                         const memberEmail = member.email || '';
                                         const memberAvatar = member.avatar || member.profilePic || null;
-                                        const isOnline = member.isOnline || false;
+                                        const isOnline = onlineUsers.includes(memberId);
                                         const isCurrentUser = memberId.toString() === authUser?._id?.toString();
                                         const isAdmin = member.role === 'admin' || member.role === 'Admin';
                                         
@@ -1527,7 +1538,7 @@ const handleFileDeleted = (fileId) => {
                                                 const memberName = member.fullName || member.name || 'Unknown';
                                                 const memberEmail = member.email || '';
                                                 const memberAvatar = member.avatar || member.profilePicture || null;
-                                                const isOnline = member.isOnline || false;
+                                                const isOnline = onlineUsers.includes(memberId);
                                                 const isCurrentUser = memberId.toString() === authUser?._id?.toString();
                                                 const isAdmin = member.role === 'admin' || member.role === 'Admin';
                                                 

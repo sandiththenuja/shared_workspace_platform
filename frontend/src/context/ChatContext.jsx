@@ -1,16 +1,18 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { AuthContext } from './AuthContext'
 import toast from 'react-hot-toast'
+import axios from 'axios'
 
 export const ChatContext = createContext()
 
 export const ChatProvider = ({children}) => {
-    const [messages, setMessages] = useState([])
+    const [receiveMessages, setReceiveMessages] = useState([])
+    const [allMessages, setAllMessages] = useState([])
     const [users, setUsers] = useState([])
     const [selectedUser, setSelectedUser] = useState(null)
     const [unseenMessages, setUnseenMessages] = useState([])
 
-    const {socket, axios} = useContext(AuthContext)
+    const {socket} = useContext(AuthContext)
 
     // fn to get all users
     const getUsers = async() => {
@@ -19,6 +21,7 @@ export const ChatProvider = ({children}) => {
             if(data.success){
                 setUsers(data.users)
                 setUnseenMessages(data.unseenMessages)
+                setAllMessages(data.allMessages)
             }
         } catch (error) {
             toast.error(error.message)
@@ -30,8 +33,9 @@ export const ChatProvider = ({children}) => {
         try {
             const {data} = await axios.get(`/api/messages/${userId}`)
             if(data.success){
-                setMessages(data.messages)
+                setReceiveMessages(data)
             }
+            return data
         } catch (error) {
             toast.error(error.message)
         }
@@ -42,7 +46,7 @@ export const ChatProvider = ({children}) => {
         try {
             const {data} = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData)
             if(data.success){
-                setMessages((prevMessages) => [...prevMessages, data.newMessage])
+                setReceiveMessages((prevMessages) => [...prevMessages, data.newMessage])
             }else{
                 toast.error(data.message)
             }
@@ -58,7 +62,7 @@ export const ChatProvider = ({children}) => {
         socket.on("newMessage", (newMessage) => {
             if(selectedUser && newMessage.senderId === selectedUser._id){
                 newMessage.seen = true
-                setMessages((prevMessages) => [...prevMessages, newMessage])
+                setReceiveMessages((prevMessages) => [...prevMessages, newMessage])
                 axios.put(`/messages/mark/${newMessage._id}`)
             }else{
                 setUnseenMessages((prevUnseenMessages) => ({
@@ -81,7 +85,8 @@ export const ChatProvider = ({children}) => {
     }, [socket, selectedUser])
 
     const value = {
-        messages,
+        receiveMessages,
+        allMessages,
         users,
         selectedUser,
         getUsers,
@@ -98,3 +103,11 @@ export const ChatProvider = ({children}) => {
     </ChatContext.Provider>
   )
 }
+
+export const useChat = () => {
+    const context = useContext(ChatContext);
+    if (!context) {
+        throw new Error('useChat must be used within a TaskProvider');
+    }
+    return context;
+};

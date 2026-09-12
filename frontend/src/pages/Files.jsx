@@ -22,6 +22,7 @@ const Files = () => {
     const [allFiles, setAllFiles] = useState([]);
     const [previewFile, setPreviewFile] = useState(null);
     const [filterType, setFilterType] = useState('all');
+    const [expandedFileId, setExpandedFileId] = useState(null);
     
     const { teams, fetchTeams, loading: teamLoading } = useTeam();
     const { authUser, token } = useAuth();
@@ -304,23 +305,23 @@ const Files = () => {
                             <RefreshCcw className="w-4 h-4" />
                             Refresh
                         </button>
-                        <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                        {/* <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
                             <Upload className="w-4 h-4" />
                             Upload
-                        </button>
+                        </button> */}
                     </div>
                 </div>
 
                 {/* Search and Filters */}
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input 
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search files by name, description, or team..."
-                            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Search files..."
+                            className="w-full pl-9 pr-9 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -393,7 +394,7 @@ const Files = () => {
                             ({allFiles.filter(f => new Date(f.uploadedAt) >= new Date(Date.now() - 7*24*60*60*1000)).length})
                         </span>
                     </button>
-                    <button
+                    {/* <button
                         onClick={() => setSelectedFolder('starred')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                             selectedFolder === 'starred'
@@ -406,8 +407,8 @@ const Files = () => {
                         <span className="text-xs text-slate-400">
                             ({allFiles.filter(f => f.isStarred).length})
                         </span>
-                    </button>
-                    <button
+                    </button> */}
+                    {/* <button
                         onClick={() => setSelectedFolder('shared')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                             selectedFolder === 'shared'
@@ -420,174 +421,335 @@ const Files = () => {
                         <span className="text-xs text-slate-400">
                             ({allFiles.filter(f => f.shared || f.isPublic).length})
                         </span>
-                    </button>
+                    </button> */}
                 </div>
 
                 {/* Files Display */}
                 {filteredFiles.length === 0 ? (
-                    <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                        <File className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                        <h3 className="text-lg font-medium text-slate-800 dark:text-white">No files found</h3>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">
-                            {searchTerm ? 'Try adjusting your search' : 'Files shared with you will appear here'}
-                        </p>
-                    </div>
-                ) : view === 'grid' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredFiles.map((file) => {
-                            const Icon = getFileIcon(file);
-                            return (
-                                <div key={file._id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 hover:shadow-lg transition-shadow group">
-                                    <div className="flex items-start justify-between">
-                                        <div className={`p-3 rounded-lg bg-slate-50 dark:bg-slate-800 ${getFileColor(file)}`}>
-                                            {Icon}
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {file.isStarred && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
-                                            {file.isPinned && <Star className="w-4 h-4 text-indigo-400 fill-indigo-400" />}
-                                            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
-                                                <MoreVertical className="w-4 h-4 text-slate-400" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3">
-                                        <p className="font-medium text-slate-800 dark:text-white truncate" title={file.name}>
-                                            {file.name}
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                                            <span>{formatFileSize(file.fileSize)}</span>
-                                            <span>•</span>
-                                            <span>{getFileTypeLabel(file)}</span>
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                                            <Users className="w-3 h-3" />
-                                            <span>{file.teamName || 'Unknown Team'}</span>
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                                            <Clock className="w-3 h-3" />
-                                            <span>{formatDate(file.uploadedAt)}</span>
-                                        </div>
-                                        {file.description && (
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                                                {file.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                        <button 
-                                            onClick={() => handlePreview(file)}
-                                            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                                        >
-                                            <Eye className="w-3 h-3" />
-                                            Preview
-                                        </button>
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={() => handleDownload(file)}
-                                                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                                title="Download"
-                                            >
-                                                <Download className="w-4 h-4 text-slate-400" />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDelete(file)}
-                                                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-4 h-4 text-red-400 hover:text-red-600" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Team</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Size</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Modified</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {filteredFiles.map((file) => {
-                                        const Icon = getFileIcon(file);
-                                        return (
-                                            <tr key={file._id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={getFileColor(file)}>
-                                                            {Icon}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-slate-800 dark:text-white truncate max-w-[200px]">
-                                                                {file.name}
-                                                            </p>
-                                                            <div className="flex items-center gap-2">
-                                                                {file.isStarred && <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />}
-                                                                {file.isPinned && <Star className="w-3 h-3 text-indigo-400 fill-indigo-400" />}
-                                                                {file.description && (
-                                                                    <span className="text-xs text-slate-400 truncate max-w-[150px]">
-                                                                        {file.description}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className="text-sm text-slate-600 dark:text-slate-300">
-                                                        {file.teamName || 'Unknown'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300 uppercase">
-                                                    {getFileTypeLabel(file)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
-                                                    {formatFileSize(file.fileSize)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
-                                                    {formatDate(file.uploadedAt)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                                    <button 
-                                                        onClick={() => handlePreview(file)}
-                                                        className="text-indigo-600 dark:text-indigo-400 hover:underline mr-2"
-                                                    >
-                                                        Preview
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDownload(file)}
-                                                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mr-2"
-                                                    >
-                                                        <Download className="w-4 h-4 inline" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDelete(file)}
-                                                        className="text-red-400 hover:text-red-600"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 inline" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+    <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+        <File className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-lg font-medium text-slate-800 dark:text-white">No files found</h3>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+            {searchTerm ? 'Try adjusting your search' : 'Files shared with you will appear here'}
+        </p>
+    </div>
+) : view === 'grid' ? (
+    /* ============ GRID VIEW (unchanged) ============ */
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {filteredFiles.map((file) => {
+            const Icon = getFileIcon(file);
+            return (
+                <div key={file._id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 hover:shadow-lg transition-shadow group">
+                    <div className="flex items-start justify-between">
+                        <div className={`p-3 rounded-lg bg-slate-50 dark:bg-slate-800 ${getFileColor(file)}`}>
+                            {Icon}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            {file.isStarred && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
+                            {file.isPinned && <Star className="w-4 h-4 text-indigo-400 fill-indigo-400" />}
                         </div>
                     </div>
-                )}
+                    <div className="mt-3">
+                        <p className="font-medium text-slate-800 dark:text-white truncate" title={file.name}>
+                            {file.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+                            <span>{formatFileSize(file.fileSize)}</span>
+                            <span>•</span>
+                            <span>{getFileTypeLabel(file)}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                            <Users className="w-3 h-3" />
+                            <span>{file.teamName || 'Unknown Team'}</span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatDate(file.uploadedAt)}</span>
+                        </div>
+                        {file.description && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                                {file.description}
+                            </p>
+                        )}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                        <button
+                            onClick={() => handleDownload(file)}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Download"
+                        >
+                            <Download className="w-4 h-4 text-slate-400" />
+                        </button>
+                        <button
+                            onClick={() => handleDelete(file)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4 text-red-400 hover:text-red-600" />
+                        </button>
+                    </div>
+                </div>
+            );
+        })}
+    </div>
+) : (
+    /* ============ LIST VIEW ============ */
+    <>
+        {/* ---------- SMALL SCREEN: icon toggles details ---------- */}
+        <div className="md:hidden space-y-2 w-screen -m-4 mb-2">
+            {filteredFiles.map((file) => {
+                const Icon = getFileIcon(file);
+                const isOpen = expandedFileId === file._id;
+
+                return (
+                    <div
+                        key={file._id}
+                        className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden transition-all"
+                    >
+                        {/* Header row — icon toggles details */}
+                        <div className="flex items-center gap-3 p-3">
+                            <button
+                                onClick={() =>
+                                    setExpandedFileId(isOpen ? null : file._id)
+                                }
+                                aria-label={isOpen ? 'Hide details' : 'Show details'}
+                                className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all
+                                           bg-slate-50 dark:bg-slate-800 ${getFileColor(file)}
+                                           ${isOpen ? 'ring-2 ring-indigo-500/40' : ''}`}
+                            >
+                                {Icon}
+                            </button>
+
+                            <button
+                                onClick={() =>
+                                    setExpandedFileId(isOpen ? null : file._id)
+                                }
+                                className="flex-1 min-w-0 text-left"
+                            >
+                                <p
+                                    className="font-medium text-sm text-slate-800 dark:text-white truncate"
+                                    title={file.name}
+                                >
+                                    {file.name}
+                                </p>
+                                <p className="text-xs text-slate-400 mt-0.5 truncate">
+                                    {getFileTypeLabel(file)} • {formatFileSize(file.fileSize)}
+                                </p>
+                            </button>
+
+                            <div className="flex items-center gap-0.5 shrink-0">
+                                {file.isStarred && (
+                                    <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                                )}
+                                {file.isPinned && (
+                                    <Star className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
+                                )}
+                                <ChevronDown
+                                    className={`w-4 h-4 text-slate-400 transition-transform ${
+                                        isOpen ? 'rotate-180' : ''
+                                    }`}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Expanded details */}
+                        {isOpen && (
+                            <div className="px-3 pb-3 border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2.5">
+                                {/* Meta grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <DetailItem
+                                        icon={FileText}
+                                        label="Type"
+                                        value={getFileTypeLabel(file)}
+                                    />
+                                    <DetailItem
+                                        icon={Download}
+                                        label="Size"
+                                        value={formatFileSize(file.fileSize)}
+                                    />
+                                    <DetailItem
+                                        icon={Users}
+                                        label="Team"
+                                        value={file.teamName || 'Unknown'}
+                                    />
+                                    <DetailItem
+                                        icon={Clock}
+                                        label="Modified"
+                                        value={formatDate(file.uploadedAt)}
+                                    />
+                                </div>
+
+                                {/* Description */}
+                                {file.description && (
+                                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                        <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 mb-1">
+                                            Description
+                                        </p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                            {file.description}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                        onClick={() => handleDownload(file)}
+                                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium
+                                                   text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800
+                                                   hover:bg-indigo-50 dark:hover:bg-indigo-500/10
+                                                   hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                    >
+                                        <Download className="w-3.5 h-3.5" />
+                                        Download
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(file)}
+                                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium
+                                                   text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10
+                                                   hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+
+        {/* ---------- DESKTOP / TABLET: full table ---------- */}
+        <div className="hidden md:block bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
+            <div className="relative">
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 z-20 bg-gradient-to-l from-white dark:from-slate-900 to-transparent lg:hidden" />
+
+                <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <table className="w-full min-w-[720px] lg:min-w-[900px]">
+                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                            <tr>
+                                <th className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[200px]">
+                                    Name
+                                </th>
+                                <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[120px]">
+                                    Team
+                                </th>
+                                <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[100px]">
+                                    Type
+                                </th>
+                                <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[90px]">
+                                    Size
+                                </th>
+                                <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[120px]">
+                                    Modified
+                                </th>
+                                <th className="sticky right-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 lg:px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[110px]">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {filteredFiles.map((file) => {
+                                const Icon = getFileIcon(file);
+                                return (
+                                    <tr
+                                        key={file._id}
+                                        className="group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <td className="sticky left-0 z-[1] bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 px-4 lg:px-6 py-3.5">
+                                            <div className="flex items-center gap-3">
+                                                <div className="shrink-0">{Icon}</div>
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-sm text-slate-800 dark:text-white truncate max-w-[180px]">
+                                                        {file.name}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        {file.isStarred && (
+                                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                        )}
+                                                        {file.isPinned && (
+                                                            <Star className="w-3 h-3 text-indigo-400 fill-indigo-400" />
+                                                        )}
+                                                        {file.description && (
+                                                            <span className="text-xs text-slate-400 truncate max-w-[120px]">
+                                                                {file.description}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td className="px-4 lg:px-6 py-3.5">
+                                            <span className="text-sm text-slate-600 dark:text-slate-300 truncate inline-block max-w-[120px]">
+                                                {file.teamName || 'Unknown'}
+                                            </span>
+                                        </td>
+
+                                        <td className="px-4 lg:px-6 py-3.5 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                            {getFileTypeLabel(file)}
+                                        </td>
+
+                                        <td className="px-4 lg:px-6 py-3.5 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                            {formatFileSize(file.fileSize)}
+                                        </td>
+
+                                        <td className="px-4 lg:px-6 py-3.5 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                            {formatDate(file.uploadedAt)}
+                                        </td>
+
+                                        <td className="sticky right-0 z-[1] bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 px-4 lg:px-6 py-3.5 text-right">
+                                            <div className="inline-flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleDownload(file)}
+                                                    aria-label="Download"
+                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(file)}
+                                                    aria-label="Delete"
+                                                    className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Scroll hint on tablet */}
+            <div className="lg:hidden flex items-center justify-center gap-1.5 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                    Swipe to see all columns →
+                </span>
+            </div>
+        </div>
+    </>
+)}
 
             </div>
         </>
     );
 };
+
+const DetailItem = ({ icon: Icon, label, value }) => (
+    <div className="min-w-0">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide font-semibold text-slate-400 mb-0.5">
+            <Icon className="w-3 h-3 shrink-0" />
+            {label}
+        </div>
+        <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+            {value}
+        </p>
+    </div>
+);
 
 export default Files;
