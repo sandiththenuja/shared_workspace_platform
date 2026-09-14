@@ -18,7 +18,7 @@ const TaskCard = ({
     task, 
     isAdmin, 
     onEdit, 
-    onDelete, 
+    onDelete,
     onProgressChange,
     updateTodoChecklist,
     teamMembers,
@@ -263,7 +263,7 @@ const handleTodoToggle = async (todoIndex) => {
             <div className="flex items-center -space-x-1.5">
                 {visibleMembers.map((memberId) => {
                     // ✅ Use memberId as key (string conversion)
-                    const memberKey = memberId?.toString() || 'unknown';
+                    const memberKey = memberId._id.toString();
                     const name = getMemberName(memberId);
                     const avatar = getMemberAvatar(memberId);
                     const isCompleted = localCompletedBy?.includes(memberId);
@@ -312,7 +312,6 @@ const handleTodoToggle = async (todoIndex) => {
             } ${isComplete ? 'border-l-4 border-emerald-500' : ''}`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-
         >
             {/* ============================================================
                 HEADER
@@ -369,7 +368,10 @@ const handleTodoToggle = async (todoIndex) => {
                     {/* Edit Button - Only for assigned members or admin */}
                     {canEdit && (
                         <button
-                            onClick={() => onEdit(task)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onEdit(task)
+                            }}
                             className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
                             title="Edit task"
                         >
@@ -380,7 +382,10 @@ const handleTodoToggle = async (todoIndex) => {
                     {/* Delete Button - Admin only */}
                     {isAdmin && (
                         <button
-                            onClick={() => onDelete(task._id)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onDelete(task._id)
+                            }}
                             className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
                             title="Delete task"
                         >
@@ -437,16 +442,6 @@ const handleTodoToggle = async (todoIndex) => {
                     </span>
                 </div>
             </div>
-
-            {/* ============================================================
-                PERMISSION INDICATOR
-                ============================================================ */}
-            {!canEdit && !isAdmin && (
-                <div className="mt-2 flex items-center gap-1 text-[10px] text-slate-400">
-                    <Eye className="w-3 h-3" />
-                    <span>View only</span>
-                </div>
-            )}
         </div>
     );
 };

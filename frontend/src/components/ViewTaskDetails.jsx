@@ -15,9 +15,10 @@ import {
     Loader2,
     AlertCircle,
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../layout/DashboardLayout';
+import { useAuth } from '../context/AuthContext';
 
 const ViewTaskDetails = () => {
     const { id } = useParams();
@@ -25,6 +26,7 @@ const ViewTaskDetails = () => {
     const [task, setTask] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const {authUser} = useAuth()
 
     // ===== color helpers =====
     const getStatusTagColor = (status) => {
@@ -55,7 +57,13 @@ const ViewTaskDetails = () => {
             setLoading(true);
             setError(null);
             const response = await axios.get(`/api/tasks/${id}`);
-            if (response.data) setTask(response.data);
+            // if (response.data) setTask(response.data);
+            if (response.data) {
+            console.log('🔍 Full task response:', response.data);
+            console.log('🔍 task.teamId:', response.data.teamId.createdBy._id);
+            console.log('🔍 authUser._id:', authUser?._id);
+            setTask(response.data);
+        }
         } catch (err) {
             console.error('Error fetching task:', err);
             setError('Failed to load task details');
@@ -91,6 +99,22 @@ const ViewTaskDetails = () => {
             setTask((prev) => ({ ...prev, todoChecklist }));
         }
     };
+
+    const isAdmin = useMemo(() => {
+        if (!authUser?._id || !task) return false;
+
+        const team = task.teamId;
+        // console.log('Full task response:', response.data);
+        // console.log('task.teamId:', response.data.teamId.createdBy._id);
+        // console.log('authUser._id:', authUser?._id);
+
+        if (team && typeof team === 'object' && team.createdBy) {
+            const creatorId = team.createdBy._id;
+            return creatorId?.toString() === authUser._id.toString();
+        }
+
+        return false;
+    }, [task, authUser]);
 
     const handleLinkClick = (link) => {
         if (!/^https?:\/\//i.test(link)) link = 'https://' + link;
@@ -203,7 +227,7 @@ const ViewTaskDetails = () => {
                                     )}
                                 </div>
                             </div>
-
+                            
                             {/* Progress ring on desktop, bar on mobile */}
                             {totalCount > 0 && (
                                 <div className="shrink-0 self-start">
@@ -281,6 +305,7 @@ const ViewTaskDetails = () => {
                                             onChange={() =>
                                                 updateTodoChecklist(index)
                                             }
+                                            isAdmin={isAdmin}
                                         />
                                     ))}
                                 </ul>
@@ -539,7 +564,7 @@ const AssigneeRow = ({ user }) => {
     );
 };
 
-const TodoCheckLists = ({ text, isChecked, onChange, index }) => {
+const TodoCheckLists = ({ text, isChecked, onChange, index, isAdmin }) => {
     return (
         <li
             className={`group flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
@@ -548,11 +573,12 @@ const TodoCheckLists = ({ text, isChecked, onChange, index }) => {
                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-sm'
             }`}
         >
-            <label className="relative flex items-center gap-3 w-full cursor-pointer">
+            <label className={`relative flex items-center gap-3 w-full ${isChecked ? `cursor-not-allowed` : `cursor-pointer`}`}>
                 <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={onChange}
+                    disabled={isChecked}
                     className="sr-only peer"
                 />
 

@@ -1,5 +1,5 @@
 // pages/Team.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     UserPlus, Search, Filter, MoreVertical, 
     Mail, Phone, Calendar, Star, Users,
@@ -821,6 +821,7 @@ const handleFileDeleted = (fileId) => {
             return false;
         }
     };
+    
 
     // Get members with online status
     const getMembersWithStatus = () => {
@@ -1319,6 +1320,9 @@ const handleFileDeleted = (fileId) => {
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
                                             {selectedTeam.description || 'No description'}
                                         </p>
+                                        {!isTeamAdmin() && (
+                                            <p className='text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-2 rounded-full'>Admin - {selectedTeam.createdBy.fullName}</p>
+                                        )}
                                         <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500 dark:text-slate-400">
                                             <span className="flex items-center gap-1">
                                                 <Users className="w-4 h-4" />
@@ -1487,9 +1491,11 @@ const handleFileDeleted = (fileId) => {
                                                                     <span className="text-xs text-indigo-500">(You)</span>
                                                                 )}
                                                             </p>
+                                                            {isTeamAdmin() ? 
                                                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {memberEmail}
-                                                            </p>
+                                                                    {memberEmail}
+                                                                </p> : ""
+                                                            }
                                                             <div className="flex items-center gap-1 mt-1">
                                                                 {isAdmin && (
                                                                     <span className="text-xs px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full">
@@ -1524,7 +1530,11 @@ const handleFileDeleted = (fileId) => {
                                         <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                                             <tr>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Member</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+
+                                                {isTeamAdmin() ? 
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th> : ""
+                                                }
+
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                                 {!viewOnlyMode && isTeamAdmin() && (
@@ -1565,9 +1575,13 @@ const handleFileDeleted = (fileId) => {
                                                                 </span>
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
+                                                        
+                                                        {isTeamAdmin() ? 
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
                                                             {memberEmail}
-                                                        </td>
+                                                        </td> : ""
+                                                        }
+                                                        
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className={`px-2 py-1 text-xs rounded-full ${
                                                                 isAdmin 
@@ -1658,17 +1672,17 @@ const handleFileDeleted = (fileId) => {
                 //     </div>
                 // </div>
                 <div onClick={() => handleClick(task._id)}>
-                <TaskCard 
-                    key={task._id}
-                    task={task}
-                    isAdmin={!viewOnlyMode && isTeamAdmin()}
-                    onEdit={openEditTaskModal}
-                    onDelete={handleDeleteTask}
-                    onProgressChange={handleProgressChange}
-                    updateTodoChecklist={updateTodoChecklist}
-                    teamMembers={selectedTeam?.members || []}
-                    currentUser={authUser}
-                />
+                    <TaskCard 
+                        key={task._id}
+                        task={task}
+                        isAdmin={!viewOnlyMode && isTeamAdmin()}
+                        onEdit={openEditTaskModal}
+                        onDelete={handleDeleteTask}
+                        onProgressChange={handleProgressChange}
+                        updateTodoChecklist={updateTodoChecklist}
+                        teamMembers={selectedTeam?.members || []}
+                        currentUser={authUser}
+                    />
                 </div>
             ))
         ) : (
@@ -2214,7 +2228,7 @@ const handleFileDeleted = (fileId) => {
                         className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
                         <select 
@@ -2243,19 +2257,11 @@ const handleFileDeleted = (fileId) => {
                         className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
                     />
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Assign Members</label>
-                    <select 
-                        multiple value={taskForm.assignedTo} 
-                        onChange={(e) => setTaskForm({...taskForm, assignedTo: Array.from(e.target.selectedOptions, option => option.value)})} 
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24"
-                    >
-                        {selectedTeam?.members?.map(member => (
-                            <option key={member._id} value={member._id}>{member.fullName}</option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple members.</p>
-                </div>
+                <AssignMembersField
+                    members={selectedTeam?.members || []}
+                    value={taskForm.assignedTo || []}
+                    onChange={(ids) => setTaskForm((prev) => ({ ...prev, assignedTo: ids }))}
+                />
                 <div className="mt-3">
               <label className='text-xs font-medium text-slate-600'>
                 Add Attachments
@@ -2384,6 +2390,212 @@ const JoinTeamModal = ({
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+};
+
+const AssignMembersField = ({ members = [], value = [], onChange }) => {
+    const [search, setSearch] = useState('');
+
+    const filtered = useMemo(() => {
+        if (!search) return members;
+        const s = search.toLowerCase();
+        return members.filter(
+            (m) =>
+                (m.fullName || m.name || '').toLowerCase().includes(s) ||
+                (m.email || '').toLowerCase().includes(s)
+        );
+    }, [members, search]);
+
+    const getId = (m) => (m._id || m).toString();
+
+    const isSelected = (m) => value.includes(getId(m));
+
+    const toggle = (m) => {
+        const id = getId(m);
+        onChange(
+            value.includes(id)
+                ? value.filter((v) => v !== id)
+                : [...value, id]
+        );
+    };
+
+    const selectAll = () => {
+        const ids = filtered.map(getId);
+        const merged = Array.from(new Set([...value, ...ids]));
+        onChange(merged);
+    };
+
+    const deselectAll = () => {
+        const ids = new Set(filtered.map(getId));
+        onChange(value.filter((v) => !ids.has(v)));
+    };
+
+    return (
+        <div className="space-y-3">
+            {/* Header row */}
+            <div className="flex items-center justify-between gap-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Assign Members
+                </label>
+                <span className="text-xs text-slate-400">
+                    {value.length} of {members.length} selected
+                </span>
+            </div>
+
+            {/* Selected chips preview */}
+            {value.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
+                    {value.map((id) => {
+                        const member = members.find((m) => getId(m) === id);
+                        const name =
+                            member?.fullName || member?.name || 'Unknown';
+                        const avatar =
+                            member?.profilePic || member?.avatar || null;
+                        const initials = name.charAt(0).toUpperCase();
+
+                        return (
+                            <span
+                                key={id}
+                                className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                            >
+                                {avatar ? (
+                                    <img
+                                        src={avatar}
+                                        alt={name}
+                                        className="w-5 h-5 rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[9px] font-semibold text-white">
+                                        {initials}
+                                    </span>
+                                )}
+                                <span className="truncate max-w-[110px]">
+                                    {name}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        toggle(member || { _id: id });
+                                    }}
+                                    className="ml-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 p-0.5"
+                                    aria-label={`Remove ${name}`}
+                                >
+                                    <X className="w-3 h-3 text-slate-400" />
+                                </button>
+                            </span>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Search + bulk actions */}
+            {members.length > 5 && (
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search members..."
+                            className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {filtered.length > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                    <button
+                        type="button"
+                        onClick={selectAll}
+                        className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                    >
+                        Select all
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-600">·</span>
+                    <button
+                        type="button"
+                        onClick={deselectAll}
+                        className="text-slate-500 dark:text-slate-400 hover:underline"
+                    >
+                        Clear
+                    </button>
+                </div>
+            )}
+
+            {/* Members list */}
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1 -mr-1">
+                {filtered.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        <Users className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                        <p className="text-sm">
+                            {search
+                                ? 'No members match your search'
+                                : 'No team members yet'}
+                        </p>
+                    </div>
+                ) : (
+                    filtered.map((member) => {
+                        const id = getId(member);
+                        const selected = isSelected(member);
+                        const name = member.fullName || member.name || 'Unknown';
+                        const email = member.email || '';
+                        const avatar =
+                            member.profilePic || member.avatar || null;
+                        const initials = name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .slice(0, 2)
+                            .toUpperCase();
+
+                        return (
+                            <div
+                                key={id}
+                                onClick={() => toggle(member)}
+                                className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border-2 ${
+                                    selected
+                                        ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500'
+                                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-transparent'
+                                }`}
+                            >
+                                <div className="relative shrink-0">
+                                    {avatar ? (
+                                        <img
+                                            src={avatar}
+                                            alt={name}
+                                            className="w-9 h-9 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs">
+                                            {initials}
+                                        </div>
+                                    )}
+                                    {selected && (
+                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-slate-800 dark:text-white truncate">
+                                        {name}
+                                    </p>
+                                    {email && (
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                            {email}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
             </div>
         </div>
     );

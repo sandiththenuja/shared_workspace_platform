@@ -67,7 +67,7 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
         { icon: MessageSquare, label: 'Team Chat', time: '4h ago' },
         { icon: FolderOpen, label: 'Design Assets', time: '1d ago' },
     ];
-
+    
     return (
         <div className={`h-screen flex overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
             {/* ===== OVERLAY ===== */}
@@ -248,9 +248,13 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-                                        {authUser?.fullName?.charAt(0) || 'U'}
-                                    </div>
+                                        {authUser?.profilePic ? (
+                                            <img src={authUser?.profilePic} alt="profile" className='w-8 h-8 rounded-full items-center justify-center' />
+                                        ) : (
+                                            <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
+                                                {authUser?.fullName?.charAt(0) || 'U'}
+                                            </div>
+                                        )}
                                     <ChevronDown className="w-4 h-4 text-slate-400 hidden sm:block" />
                                 </button>
 

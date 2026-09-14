@@ -59,7 +59,10 @@ const CreateCanvasModal = ({ isOpen, onClose, onCreate }) => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Create New Canvas</h3>
+                    <div className='flex flex-col'>
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Create New Canvas</h3>
+                        <p className='text-sm text-slate-600'>Make sure that you selected a team</p>
+                    </div>
                     <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleSubmit}>
@@ -68,8 +71,8 @@ const CreateCanvasModal = ({ isOpen, onClose, onCreate }) => {
                         <input type="text" value={newCanvas.name} onChange={(e) => setNewCanvas({ ...newCanvas, name: e.target.value })} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter canvas name" required autoFocus />
                     </div>
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                        <textarea value={newCanvas.description} onChange={(e) => setNewCanvas({ ...newCanvas, description: e.target.value })} rows={3} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Optional description" />
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description <span className="text-red-500">*</span></label>
+                        <textarea value={newCanvas.description} onChange={(e) => setNewCanvas({ ...newCanvas, description: e.target.value })} rows={3} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Optional description" required />
                     </div>
                     <div className="flex items-center gap-3">
                         <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel</button>
@@ -120,7 +123,17 @@ const CanvasCard = ({ canvas, onSelect, onDelete, isSelected }) => {
     return (
         <div className={`bg-white dark:bg-slate-900 rounded-xl border-2 transition-all cursor-pointer group ${isSelected ? 'border-indigo-500 shadow-lg shadow-indigo-500/20' : 'border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700'} hover:shadow-lg transition-all duration-200`} onClick={() => onSelect(canvas._id)}>
             <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-t-xl overflow-hidden">
-                <div className="flex items-center justify-center h-full"><FileText className="w-16 h-16 text-slate-300 dark:text-slate-600" /></div>
+                {canvas.thumbnail ? (
+                    <img
+                        src={canvas.thumbnail}
+                        alt={canvas.name || 'Canvas preview'}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full"><FileText className="w-16 h-16 text-slate-300 dark:text-slate-600" /></div>
+                )}
+                
                 {isSelected && <div className="absolute top-2 right-2 bg-indigo-500 text-white rounded-full p-1"><Eye className="w-4 h-4" /></div>}
                 {canvas.collaborators?.length > 0 && <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><Users className="w-3 h-3" />{canvas.collaborators.length}</div>}
             </div>
@@ -170,24 +183,22 @@ const CanvasDashboard = () => {
     }, [teams, fetchTeams, currentTeamId]);
 
     // Fetch canvases from backend when team changes using Axios
-    useEffect(() => {
+    const fetchCanvases = async (currentTeamId) => {
         if (!currentTeamId) return;
-        
-        const fetchCanvases = async () => {
-            try {
-                // Axios automatically uses the baseURL and Auth token set in AuthContext
-                const { data } = await axios.get(`/api/canvases/team/${currentTeamId}`);
-                if (data.success) {
-                    setCanvases(data.canvases);
-                }
-            } catch (error) {
-                console.error('Error fetching canvases:', error);
-                toast.error(error.response?.data?.message || 'Failed to fetch canvases');
+        try {
+            // Axios automatically uses the baseURL and Auth token set in AuthContext
+            const { data } = await axios.get(`/api/canvases/team/${currentTeamId}`);
+            if (data.success) {
+                setCanvases(data.canvases);
             }
-        };
-
-        fetchCanvases();
-    }, [currentTeamId]);
+        } catch (error) {
+            console.error('Error fetching canvases:', error);
+            toast.error(error.response?.data?.message || 'Failed to fetch canvases');
+        }
+    };
+    useEffect(() => {
+        fetchCanvases(currentTeamId);
+    }, [currentTeamId, fetchCanvases]);
 
     const handleTeamSelect = (teamId) => setCurrentTeamId(teamId);
 
@@ -241,6 +252,7 @@ const CanvasDashboard = () => {
     const handleCloseCanvasModal = () => { 
         setShowCanvasModal(false); 
         setSelectedCanvasId(null); 
+        fetchCanvases(currentTeamId)
     };
 
     const filteredCanvases = canvases
@@ -279,7 +291,7 @@ const CanvasDashboard = () => {
                             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
                                 <option value="updatedAt">Last Updated</option><option value="createdAt">Date Created</option><option value="name">Name</option>
                             </select>
-                            <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden hidden sm:block">
                                 <button onClick={() => setViewMode('grid')} className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Grid className="w-4 h-4" /></button>
                                 <button onClick={() => setViewMode('list')} className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><List className="w-4 h-4" /></button>
                             </div>

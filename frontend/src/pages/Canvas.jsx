@@ -58,6 +58,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                     setDrawingData(loadedShapes);
                     setHistory([loadedShapes]);
                     setHistoryIndex(0);
+                    console.log(data);
                     
                     setTimeout(() => redrawCanvas(loadedShapes), 100);
                     toast.success('Canvas loaded successfully');
@@ -107,21 +108,76 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
     }, [drawingData, isLoading, historyIndex]);
 
     const saveToBackend = async () => {
-        if (!canvasId) return;
-        try {
-            const { data } = await axios.put(`/api/canvases/${canvasId}`, {
-                drawingData: drawingData
-            });
-            
-            if (data.success) {
-                toast.success('Auto-saved', { duration: 2000 });
-                setCanvasInfo(prev => ({ ...prev, updatedAt: new Date().toISOString() }));
-            }
-        } catch (error) {
-            console.error('Auto-save failed:', error);
-            toast.error('Auto-save failed');
+    if (!canvasId) return;
+
+    try {
+        // Automatically generate the thumbnail from the current canvas state
+        const thumbnail = generateThumbnail(
+            canvasRef.current,
+            drawingData && drawingData.length > 0
+        );
+
+        // Build the payload — thumbnail is included automatically
+        const payload = { drawingData };
+        if (thumbnail) {
+            payload.thumbnail = thumbnail;
         }
-    };
+
+        const { data } = await axios.put(`/api/canvases/${canvasId}`, payload);
+
+        if (data.success) {
+            toast.success('Auto-saved', { duration: 2000 });
+
+            // Keep local state in sync with what the server returned
+            setCanvasInfo((prev) => ({
+                ...prev,
+                ...(data.canvas || {}),
+                updatedAt: data.canvas?.updatedAt || new Date().toISOString(),
+            }));
+        }
+    } catch (error) {
+        console.error('Auto-save failed:', error);
+        toast.error('Auto-save failed');
+    }
+};
+
+    // ============ GENERATE THUMBNAIL ============
+// Renders the current canvas into a small offscreen canvas and returns a JPEG data URL.
+// Returns null if there's nothing to save (empty canvas).
+const generateThumbnail = (canvasEl, hasContent, maxWidth = 320, maxHeight = 200) => {
+    if (!canvasEl) return null;
+    if (!hasContent) return null; // don't save blank thumbnails
+
+    try {
+        const off = document.createElement('canvas');
+        off.width = maxWidth;
+        off.height = maxHeight;
+        const octx = off.getContext('2d');
+
+        // White background so the thumbnail looks clean on cards
+        octx.fillStyle = '#ffffff';
+        octx.fillRect(0, 0, maxWidth, maxHeight);
+
+        // Scale the source canvas into the thumbnail
+        octx.drawImage(
+            canvasEl,
+            0,
+            0,
+            canvasEl.width,
+            canvasEl.height,
+            0,
+            0,
+            maxWidth,
+            maxHeight
+        );
+
+        // JPEG at 0.7 quality is ~10KB for a 320x200 image
+        return off.toDataURL('image/jpeg', 0.7);
+    } catch (err) {
+        console.error('Thumbnail generation failed:', err);
+        return null;
+    }
+};
 
     // ============ ADD COLLABORATOR METHOD ============
     const handleAddCollaborator = async () => {
@@ -227,87 +283,114 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         ctx.restore();
     }, []);
 
-    const getMouseCoords = (e) => {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = canvasRef.current.width / rect.width;
-        const scaleY = canvasRef.current.height / rect.height;
+    // const getMouseCoords = (e) => {
+    //     const rect = canvasRef.current.getBoundingClientRect();
+    //     const scaleX = canvasRef.current.width / rect.width;
+    //     const scaleY = canvasRef.current.height / rect.height;
+    //     return {
+    //         x: (e.clientX - rect.left) * scaleX,
+    //         y: (e.clientY - rect.top) * scaleY
+    //     };
+    // };
+    const getPointerCoords = (e) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        let clientX, clientY;
+
+        // Touch event
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            // touchend — use changedTouches
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            // Mouse or pointer event
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
         return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY,
         };
     };
 
     const startDrawing = (e) => {
-        if (!canvasRef.current) return;
-        const { x, y } = getMouseCoords(e);
-        
-        setIsDrawing(true);
-        startPointRef.current = { x, y };
+    if (!canvasRef.current) return;
+    if (e.cancelable) e.preventDefault();   // stop scroll/zoom during draw
+
+    const { x, y } = getPointerCoords(e);
+
+    setIsDrawing(true);
+    startPointRef.current = { x, y };
+    lastPointRef.current = { x, y };
+    coordinatesArrayRef.current = [{ x, y }];
+
+    if (tool === 'text') {
+        const text = window.prompt('Enter text:');
+        if (text) {
+            const newText = { type: 'text', x, y, text, fontSize: 16, color };
+            const updatedData = [...drawingData, newText];
+            setDrawingData(updatedData);
+            setHistory(prev => [...prev.slice(0, historyIndex + 1), updatedData]);
+            setHistoryIndex(prev => prev + 1);
+            redrawCanvas(updatedData);
+        }
+        setIsDrawing(false);
+        coordinatesArrayRef.current = [];
+    }
+};
+
+const draw = (e) => {
+    if (!isDrawing || !canvasRef.current) return;
+    if (e.cancelable) e.preventDefault();
+
+    const { x, y } = getPointerCoords(e);
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+
+    coordinatesArrayRef.current.push({ x, y });
+
+    if (tool === 'pen' || tool === 'eraser') {
+        ctx.beginPath();
+        ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
+        ctx.lineWidth = tool === 'eraser' ? 20 : strokeWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
         lastPointRef.current = { x, y };
-        
-        coordinatesArrayRef.current = [{ x, y }];
+    } else if (tool === 'rectangle' || tool === 'circle') {
+        redrawCanvas(drawingData);
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-        if (tool === 'text') {
-            const text = prompt('Enter text:');
-            if (text) {
-                const newText = { type: 'text', x, y, text, fontSize: 16, color };
-                const updatedData = [...drawingData, newText];
-                setDrawingData(updatedData);
-                setHistory(prev => [...prev.slice(0, historyIndex + 1), updatedData]);
-                setHistoryIndex(prev => prev + 1);
-                redrawCanvas(updatedData);
-            }
-            setIsDrawing(false);
-            coordinatesArrayRef.current = [];
+        const startX = startPointRef.current.x;
+        const startY = startPointRef.current.y;
+
+        if (tool === 'rectangle') {
+            ctx.rect(startX, startY, x - startX, y - startY);
+        } else {
+            const radius = Math.sqrt((x - startX) ** 2 + (y - startY) ** 2);
+            ctx.arc(startX, startY, Math.max(0, radius), 0, 2 * Math.PI);
         }
-    };
+        ctx.stroke();
+    }
+};
 
-    const draw = (e) => {
-        if (!isDrawing || !canvasRef.current) return;
-        
-        const { x, y } = getMouseCoords(e);
-        const ctx = ctxRef.current;
-        if (!ctx) return;
-
-        coordinatesArrayRef.current.push({ x, y });
-
-        if (tool === 'pen' || tool === 'eraser') {
-            ctx.beginPath();
-            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
-            ctx.lineWidth = tool === 'eraser' ? 20 : strokeWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            
-            lastPointRef.current = { x, y };
-        } 
-        else if (tool === 'rectangle' || tool === 'circle') {
-            redrawCanvas(drawingData);
-            
-            ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = strokeWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            const startX = startPointRef.current.x;
-            const startY = startPointRef.current.y;
-            
-            if (tool === 'rectangle') {
-                const width = x - startX;
-                const height = y - startY;
-                ctx.rect(startX, startY, width, height);
-            } else if (tool === 'circle') {
-                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                ctx.arc(startX, startY, Math.max(0, radius), 0, 2 * Math.PI);
-            }
-            ctx.stroke();
-        }
-    };
-
-    const stopDrawing = () => {
+    const stopDrawing = (e) => {
+        if (e?.cancelable) e.preventDefault();
         if (!isDrawing) return;
         setIsDrawing(false);
         
@@ -413,6 +496,19 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
         }
     };
 
+    // useEffect(() => {
+    //     const canvasEl = canvasRef.current;
+    //     if (!canvasEl) return;
+    //     try {
+    //         const link = document.createElement('a');
+    //         link.download = `${canvasInfo?.name || 'canvas'}.png`;
+    //         link.href = canvasEl.toDataURL('image/png');
+    //         link.click()
+    //     } catch (error) {
+    //         toast.error('Failed to save image');
+    //     }
+    // }, [saveDrawing])
+
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
     const resetZoom = () => setZoom(1);
@@ -427,64 +523,137 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
     return (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex flex-col h-full relative">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b border-slate-200/80 dark:border-slate-700/80 flex-shrink-0">
-                <div className="flex flex-wrap items-center gap-1">
-                    <button onClick={() => setTool('pen')} className={`p-2 rounded-lg transition-colors ${tool === 'pen' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Pen"><Pencil className="w-5 h-5" /></button>
-                    <button onClick={() => setTool('rectangle')} className={`p-2 rounded-lg transition-colors ${tool === 'rectangle' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Rectangle"><Square className="w-5 h-5" /></button>
-                    <button onClick={() => setTool('circle')} className={`p-2 rounded-lg transition-colors ${tool === 'circle' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Circle"><Circle className="w-5 h-5" /></button>
-                    <button onClick={() => setTool('text')} className={`p-2 rounded-lg transition-colors ${tool === 'text' ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Text"><Type className="w-5 h-5" /></button>
-                    <button onClick={() => setTool('eraser')} className={`p-2 rounded-lg transition-colors ${tool === 'eraser' ? 'bg-red-100 dark:bg-red-500/20 text-red-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Eraser"><Eraser className="w-5 h-5" /></button>
-                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-slate-200 dark:border-slate-700" />
-                    <select value={strokeWidth} onChange={(e) => setStrokeWidth(parseInt(e.target.value))} className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-sm">
-                        <option value="1">1px</option><option value="2">2px</option><option value="4">4px</option><option value="6">6px</option><option value="8">8px</option><option value="12">12px</option>
-                    </select>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-1">
-                    <button onClick={undo} disabled={historyIndex <= 0} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" title="Undo"><Undo2 className="w-5 h-5" /></button>
-                    <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" title="Redo"><Redo2 className="w-5 h-5" /></button>
-                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button onClick={handleZoomOut} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Zoom Out"><Minus className="w-5 h-5" /></button>
-                    <span className="text-sm text-slate-600 dark:text-slate-300 min-w-[40px] text-center">{Math.round(zoom * 100)}%</span>
-                    <button onClick={handleZoomIn} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Zoom In"><PlusIcon className="w-5 h-5" /></button>
-                    <button onClick={resetZoom} className="px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors">Reset</button>
-                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button onClick={saveDrawing} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-green-600" title="Save"><Save className="w-5 h-5" /></button>
-                    <button onClick={exportImage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Export"><Download className="w-5 h-5" /></button>
-                    <button onClick={clearCanvas} className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-red-500" title="Clear"><Trash2 className="w-5 h-5" /></button>
-                    <button onClick={() => setShowCollaborators(!showCollaborators)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative" title="Team & Collaborators">
-                        <Users className="w-5 h-5" />
-                        {canvasInfo?.collaborators?.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center">{canvasInfo.collaborators.length}</span>}
-                    </button>
-                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
-                </div>
-            </div>
+<div className="flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 border-b border-slate-200/80 dark:border-slate-700/80 flex-shrink-0">
+    {/* Drawing tools */}
+    <div className="flex flex-wrap items-center gap-1">
+        {[
+            { id: 'pen', icon: Pencil, label: 'Pen' },
+            { id: 'rectangle', icon: Square, label: 'Rectangle' },
+            { id: 'circle', icon: Circle, label: 'Circle' },
+            { id: 'text', icon: Type, label: 'Text' },
+            { id: 'eraser', icon: Eraser, label: 'Eraser', isEraser: true },
+        ].map(({ id, icon: Icon, isEraser }) => (
+            <button
+                key={id}
+                onClick={() => setTool(id)}
+                className={`p-2 rounded-lg transition-colors ${
+                    tool === id
+                        ? isEraser
+                            ? 'bg-red-100 dark:bg-red-500/20 text-red-600'
+                            : 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title={id.charAt(0).toUpperCase() + id.slice(1)}
+                aria-label={id}
+            >
+                <Icon className="w-3 h-3 sm:w-5 sm:h-5" />
+            </button>
+        ))}
+
+        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
+
+        <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="w-8 h-8 sm:w-8 sm:h-8 rounded cursor-pointer border border-slate-200 dark:border-slate-700"
+            aria-label="Color"
+        />
+
+        <select
+            value={strokeWidth}
+            onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+            className="px-1.5 sm:px-2 py-1.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-xs sm:text-sm"
+            aria-label="Stroke width"
+        >
+            <option value="1">1px</option>
+            <option value="2">2px</option>
+            <option value="4">4px</option>
+            <option value="6">6px</option>
+            <option value="8">8px</option>
+            <option value="12">12px</option>
+        </select>
+    </div>
+
+    {/* Actions */}
+    <div className="flex flex-wrap items-center gap-1">
+        <button onClick={undo} disabled={historyIndex <= 0} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" aria-label="Undo">
+            <Undo2 className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+        <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" aria-label="Redo">
+            <Redo2 className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+
+        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
+
+        <button onClick={handleZoomOut} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Zoom out">
+            <Minus className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+        <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 min-w-[30px] text-center tabular-nums">
+            {Math.round(zoom * 100)}%
+        </span>
+        <button onClick={handleZoomIn} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Zoom in">
+            <PlusIcon className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+
+        <button onClick={saveDrawing} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-green-600" aria-label="Save">
+            <Save className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+        <button onClick={exportImage} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Export">
+            <Download className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+        <button onClick={clearCanvas} className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/10 transition-colors text-red-500" aria-label="Clear">
+            <Trash2 className="w-3 h-3 sm:w-5 sm:h-5" />
+        </button>
+        <button onClick={() => setShowCollaborators(!showCollaborators)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative" aria-label="Collaborators">
+            <Users className="w-3 h-3 sm:w-5 sm:h-5" />
+            {canvasInfo?.collaborators?.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center">
+                    {canvasInfo.collaborators.length}
+                </span>
+            )}
+        </button>
+    </div>
+</div>
 
             {/* Canvas Container with Zoom */}
-            <div 
-                className="flex-1 overflow-auto p-4 bg-slate-50 dark:bg-slate-800 relative"
-                style={{ cursor: 'crosshair' }}
-            >
-                <div style={{ 
-                    transform: `scale(${zoom})`,
-                    transformOrigin: 'top left',
-                    transition: 'transform 0.1s ease'
-                }}>
+            <div
+    className="flex-1 overflow-auto p-2 sm:p-4 bg-slate-50 dark:bg-slate-800 relative"
+    style={{ cursor: 'crosshair' }}
+>
+    <div
+        style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: 'top left',
+            transition: 'transform 0.1s ease',
+            width: '100%',
+            maxWidth: '1200px',
+        }}
+    >
                     <canvas
                         id="main-canvas"
                         ref={canvasRef}
-                        className="border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg bg-white"
-                        style={{ width: '1200px', height: '800px' }}
+                        className="border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg bg-white touch-none"
+                        style={{
+                            width: '100%',
+                            maxWidth: '1200px',
+                            height: 'auto',
+                            aspectRatio: '1200 / 800',
+                            touchAction: 'none',
+                        }}
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
                         onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                        onTouchCancel={stopDrawing}
                     />
                 </div>
 
                 {/* Floating Team Members Avatar Stack (Right Side) */}
-                <div className="absolute top-6 right-6 flex flex-col items-center gap-2 z-20">
+                <div className="hidden lg:flex fixed top-42 right-6 flex-col items-center gap-2 z-20">
                     {teamMembers.map((member) => {
                         // Fixed: Use toString() for comparing IDs
                         const collab = canvasInfo?.collaborators?.find(c => c.user._id.toString() === member._id.toString());
@@ -515,7 +684,7 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
 
             {/* Collaborators & Team Management Panel */}
             {showCollaborators && (
-                <div className="absolute top-16 right-4 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-4 w-80 z-30 flex flex-col gap-4 max-h-[85vh]">
+                <div className="absolute inset-0 sm:inset-auto sm:top-16 sm:right-4 bg-white dark:bg-slate-900 sm:rounded-lg shadow-xl border-0 sm:border sm:border-slate-200 sm:dark:border-slate-700 p-4 w-full sm:w-80 z-30 flex flex-col gap-4 max-h-full sm:max-h-[85vh]">
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
                         <h4 className="font-semibold text-slate-800 dark:text-white">Team Roster</h4>
                         <button onClick={() => setShowCollaborators(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"><X className="w-4 h-4" /></button>
@@ -594,20 +763,27 @@ const Canvas = ({ canvasId, teamId, onClose }) => {
                 </div>
             )}
 
-            {/* Status Bar */}
-            <div className="flex items-center justify-between px-4 py-2 border-t border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">
-                <div className="flex items-center gap-4">
-                    <span>Tool: {tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
-                    <span>Color: <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: color }}></span></span>
-                    <span>Stroke: {strokeWidth}px</span>
-                    <span className="text-green-500">● Ready</span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <span>Shapes: {drawingData.length}</span>
-                    <span>Zoom: {Math.round(zoom * 100)}%</span>
-                    <span>Last saved: {canvasInfo?.updatedAt ? new Date(canvasInfo.updatedAt).toLocaleTimeString() : 'Never'}</span>
-                </div>
-            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5 sm:py-2 border-t border-slate-200/80 dark:border-slate-700/80 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">
+    <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+        <span>Tool: {tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
+        <span className="inline-flex items-center gap-1">
+            Color:
+            <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: color }} />
+        </span>
+        <span>Stroke: {strokeWidth}px</span>
+        <span className="text-green-500">● Ready</span>
+    </div>
+    <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+        <span>Shapes: {drawingData.length}</span>
+        <span>Zoom: {Math.round(zoom * 100)}%</span>
+        <span className="hidden sm:inline">
+            Last saved:{' '}
+            {canvasInfo?.updatedAt
+                ? new Date(canvasInfo.updatedAt).toLocaleTimeString()
+                : 'Never'}
+        </span>
+    </div>
+</div>
 
             {/* Loading Overlay */}
             {isLoading && (
