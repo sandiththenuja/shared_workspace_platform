@@ -85,7 +85,14 @@ export const getTaskById = async(req, res) => {
         const task = await Task.findById(req.params.id).populate(
             "assignedTo", 
             "name email profilePic"
-        )
+        ).populate({
+                path: 'teamId',
+                select: 'name createdBy',
+                populate: {
+                    path: 'createdBy',
+                    select: 'fullName email profilePic',
+                },
+            });
 
         if (!task) return res.status(404).json({message: "Task not found"})
 

@@ -192,7 +192,7 @@ export const getCanvasById = async (req, res) => {
 export const updateCanvas = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, isPublic, tags, drawingData, background, canvasSize } = req.body;
+        const { name, description, isPublic, tags, drawingData, thumbnail, background, canvasSize } = req.body;
         const userId = req.user._id;
 
         const canvas = await Canvas.findById(id);
@@ -220,6 +220,10 @@ export const updateCanvas = async (req, res) => {
         if (drawingData) updateData.drawingData = drawingData;
         if (background) updateData.background = background;
         if (canvasSize) updateData.canvasSize = canvasSize;
+
+        if (typeof thumbnail === 'string' && thumbnail.startsWith('data:image')) {
+            updateData.thumbnail = thumbnail;
+        }
 
         const updatedCanvas = await Canvas.findByIdAndUpdate(
             id,

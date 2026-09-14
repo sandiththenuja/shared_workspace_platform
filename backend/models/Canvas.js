@@ -40,6 +40,7 @@ const canvasSchema = new mongoose.Schema({
         type: Array,
         default: []
     },
+    thumbnail: { type: String, default: "" },
     background: {
         type: String,
         default: '#ffffff'
@@ -48,11 +49,11 @@ const canvasSchema = new mongoose.Schema({
         width: { type: Number, default: 1200 },
         height: { type: Number, default: 800 }
     },
-    isPublic: {
-        type: Boolean,
-        default: false
-    },
-    tags: [String],
+    // isPublic: {
+    //     type: Boolean,
+    //     default: false
+    // },
+    // tags: [String],
     lastActive: {
         type: Date,
         default: Date.now
