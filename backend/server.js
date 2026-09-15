@@ -49,9 +49,16 @@ app.use("/api/canvases", canvasRouter);
 
 app.use("/", (req, res) => res.send("Server is live"));
 
+await connectDB();
+
 const startServer = async () => {
-    await connectDB();
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => console.log(`Server on PORT: http://localhost:${PORT}`));
 };
-startServer();
+
+if(process.env.NODE_ENV !== "production"){
+    startServer();
+}
+
+// export server for vercel
+export default server
