@@ -21,6 +21,7 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const [chats, setChats] = useState([]);
     const [messages, setMessages] = useState([]);
+    const [editMessage, setEditMessage] = useState(null);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -163,7 +164,12 @@ const Chat = () => {
         }
     };
 
+    const handleEditInput = (e) => {
+        setEditMessage(e.target.value)
+    }
+
     const handleEditMessage = async (messageId, newText) => {
+        setSending(true)
         try {
             const { data } = await axios.put(`/api/messages/${messageId}`, { text: newText });
             if (data.success) {
@@ -176,6 +182,8 @@ const Chat = () => {
         } catch (error) {
             console.error('Failed to edit message:', error);
             toast.error(error.response?.data?.message || 'Failed to edit message');
+        }finally{
+            setSending(false)
         }
     };
 
@@ -393,27 +401,27 @@ const Chat = () => {
                             <>
                                 <button
                                     onClick={() => setEditingMessage(message)}
-                                    className="p-2 md:p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                    className="p-2 md:p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 lg:transition-colors"
                                     title="Edit"
                                 >
-                                    <Edit2 className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
+                                    <Edit2 className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400" />
                                 </button>
                                 <button
                                     onClick={() => handleDeleteMessage(message._id)}
-                                    className="p-2 md:p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                    className="p-2 md:p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 lg:transition-colors"
                                     title="Delete"
                                 >
-                                    <Trash2 className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
+                                    <Trash2 className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-400" />
                                 </button>
                             </>
                         )}
-                        <button
+                        {/* <button
                             onClick={() => handleReaction(message._id, '👍')}
                             className="p-2 md:p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                             title="React"
                         >
                             <Smile className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>
@@ -735,17 +743,6 @@ const Chat = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                <button className="hidden sm:inline-flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <Phone className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                                </button>
-                                <button className="hidden sm:inline-flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <Video className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                                </button>
-                                <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <MoreVertical className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                                </button>
-                            </div>
                         </div>
 
                         {/* Messages */}
@@ -817,9 +814,22 @@ const Chat = () => {
                                             if (e.key === 'Enter') handleEditMessage(editingMessage._id, e.target.value);
                                             if (e.key === 'Escape') setEditingMessage(null);
                                         }}
+                                        onChange={(e) => setEditMessage(e.target.value)}
                                         className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         autoFocus
                                     />
+                                    <button
+                                    type="submit"
+                                    className="p-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                    aria-label="Send"
+                                    onClick={(e) => handleEditMessage(editingMessage._id, editMessage)}
+                                >
+                                    {sending ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <Send className="w-5 h-5" />
+                                    )}
+                                </button>
                                     <button
                                         onClick={() => setEditingMessage(null)}
                                         className="p-2 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -831,6 +841,7 @@ const Chat = () => {
                         )}
 
                         {/* Composer */}
+                        {!editingMessage && (
                         <div className="p-2 sm:p-4 border-t border-slate-200/80 dark:border-slate-700/80">
                             <form onSubmit={sendMessage} className="flex items-center gap-1.5 sm:gap-2">
                                 <button
@@ -855,14 +866,14 @@ const Chat = () => {
                                     placeholder="Type a message..."
                                     className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
-                                <button
+                                {/* <button
                                     type="button"
                                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                                     className="hidden sm:inline-flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
                                     aria-label="Emoji"
                                 >
                                     <Smile className="w-5 h-5 text-slate-400" />
-                                </button>
+                                </button> */}
                                 <button
                                     type="submit"
                                     disabled={(!message.trim() && !selectedImage) || sending}
@@ -877,6 +888,7 @@ const Chat = () => {
                                 </button>
                             </form>
                         </div>
+                        )}
                     </div>
                 ) : (
                     /* No chat selected */

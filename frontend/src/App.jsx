@@ -16,6 +16,9 @@ import ProtectedRoute from './components/auth/ProtectedRoute'
 import CanvasDashboard from './pages/CanvasDashboard'
 import DashboardRouter from './layout/DashboardRouter'
 import ViewTaskDetails from './components/ViewTaskDetails'
+import TeamDetails from './pages/TeamDetails'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 
 function App() {
   const {authUser} = useContext(AuthContext)
@@ -26,12 +29,15 @@ function App() {
       <Toaster />
       <Routes>
         <Route path='/' element={<LandingPage />} />
+        <Route path='/privacy' element={<Privacy />} />
+        <Route path='/terms' element={<Terms />} />
         <Route path='/login' element={!authUser ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
         <Route path='/dashboard' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/chat' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/files' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/team' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-        <Route path='/team/task/:id' element={<ProtectedRoute><ViewTaskDetails /></ProtectedRoute>} />
+        <Route path='/team/:teamId' element={<ProtectedRoute><TeamDetails /></ProtectedRoute>} />
+        <Route path='/team/:teamId/task/:id' element={<ProtectedRoute><ViewTaskDetails /></ProtectedRoute>} />
         <Route path='/analytics' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/calendar' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
         <Route path='/canvas' element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />

@@ -297,7 +297,7 @@ const CreateTeamModal = ({
                         {/* Description */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                Description
+                                Description <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -312,6 +312,7 @@ const CreateTeamModal = ({
                                             : 'border-slate-200 dark:border-slate-700'
                                     }`}
                                     maxLength={500}
+                                    required
                                 />
                                 <span className="absolute right-3 bottom-2 text-xs text-slate-400">
                                     {description.length}/500
@@ -329,7 +330,7 @@ const CreateTeamModal = ({
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Invite Code
+                                    Invite Code <span className="text-red-500">*</span>
                                 </label>
                                 <button
                                     type="button"

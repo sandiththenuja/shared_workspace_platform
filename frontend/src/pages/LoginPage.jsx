@@ -4,6 +4,7 @@ import {
     Menu, X, Calculator, Rocket, Users, Shield
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
+import PrivacyPolicyModal from '../components/modals/PrivacyPolicyModal';
 
 const LoginPage = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -12,6 +13,9 @@ const LoginPage = () => {
     const [password, setPassword] = useState("");
     const [bio, setBio] = useState("");
     const [acceptTerms, setAcceptTerms] = useState(false);
+
+    const [showPrivacy, setShowPrivacy] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
 
     const { login } = useContext(AuthContext);
 
@@ -35,10 +39,10 @@ const LoginPage = () => {
                 <div className="md:w-2/5 bg-gradient-to-br from-indigo-500 to-purple-600 p-8 md:p-12 flex flex-col justify-between text-white hidden md:flex">
                     <div>
                         <div className="flex items-center gap-3 mb-8">
-                            <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                                <BookOpen className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 flex items-center justify-center">
+                                <img src="./icon.png" alt="icon"/>
                             </div>
-                            <span className="text-xl font-bold">CollabNest</span>
+                            <span className="text-xl font-bold">Converge</span>
                         </div>
                         <h2 className="text-2xl font-bold mb-4">
                             {isLogin ? 'Welcome Back!' : 'Join the Community'}
@@ -57,7 +61,7 @@ const LoginPage = () => {
                         </div>
                         <div className="flex items-center gap-3 text-sm text-white/80">
                             <CheckCircle className="w-5 h-5 text-emerald-300 flex-shrink-0" />
-                            <span>AI-powered workspace</span>
+                            <span>Automated workspace</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-white/80">
                             <CheckCircle className="w-5 h-5 text-emerald-300 flex-shrink-0" />
@@ -169,8 +173,15 @@ const LoginPage = () => {
                                     className="mt-1 w-4 h-4 rounded border-slate-300 text-indigo-500 focus:ring-indigo-500"
                                     required
                                 />
-                                <label className="text-xs text-slate-500">
-                                    I agree to the Terms of Service and Privacy Policy
+                                <label className="text-xs text-slate-500 leading-relaxed">
+                                    I agree to the{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPrivacy(true)}
+                                        className="text-indigo-500 hover:underline font-medium"
+                                    >
+                                        Terms and Privacy Policy
+                                    </button>
                                 </label>
                             </div>
                         )}
@@ -197,14 +208,14 @@ const LoginPage = () => {
                         </div>
 
                         {/* Divider */}
-                        <div className="flex items-center gap-4 mt-2">
+                        {/* <div className="flex items-center gap-4 mt-2">
                             <div className="flex-1 h-px bg-slate-200"></div>
                             <span className="text-xs text-slate-400 whitespace-nowrap">or continue with</span>
                             <div className="flex-1 h-px bg-slate-200"></div>
-                        </div>
+                        </div> */}
 
                         {/* Social Buttons */}
-                        <div className="flex gap-3">
+                        {/* <div className="flex gap-3">
                             <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all text-sm text-slate-600">
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -220,10 +231,14 @@ const LoginPage = () => {
                                 </svg>
                                 GitHub
                             </button>
-                        </div>
+                        </div> */}
                     </form>
                 </div>
             </div>
+            <PrivacyPolicyModal
+    isOpen={showPrivacy}
+    onClose={() => setShowPrivacy(false)}
+/>
         </div>
     );
 };

@@ -426,6 +426,28 @@ export const TaskProvider = ({ children }) => {
         };
     };
 
+    const handleDownloadReport = async() => {
+        try {
+        const response = await axios.get('/api/reports/export/tasks', {
+            responseType: "blob"
+        })
+
+        // create url for blob
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement("a")
+        link.href = url
+        link.setAttribute("download", "task_details.xlsx")
+        document.body.appendChild(link)
+        link.click()
+        link.parentNode.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        } catch (error) {
+        console.error("Error downloading", error);
+        toast.error("Error to download try again")
+        
+        }
+    }
+
     // Socket event listeners
     useEffect(() => {
         if (!socket) return;
@@ -518,6 +540,8 @@ export const TaskProvider = ({ children }) => {
 
         filterTasks,
         getTaskStatistics,
+
+        handleDownloadReport,
         
         refreshTasks: () => getTasks(),
         clearCurrentTask: () => setCurrentTask(null),

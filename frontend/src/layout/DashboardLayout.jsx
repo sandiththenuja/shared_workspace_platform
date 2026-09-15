@@ -92,10 +92,12 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                     {isSidebarOpen ? (
                         <>
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                                    <span className="text-white font-bold text-sm">CW</span>
+                                <div className="w-8 h-8 rounded-xl">
+                                    <span className="text-white font-bold text-sm">
+                                        <img src="./icon.png" alt="icon"/>
+                                    </span>
                                 </div>
-                                <span className="font-semibold text-slate-800 dark:text-white text-lg">CollabNest</span>
+                                <span className="font-semibold text-slate-800 dark:text-white text-lg">Converge</span>
                             </div>
                             <button 
                                 onClick={() => setIsSidebarOpen(false)}
@@ -106,8 +108,10 @@ const DashboardLayout = ({ children, activeTab = 'dashboard', onNavigate }) => {
                         </>
                     ) : (
                         <>
-                            <div className="w-8 h-8 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                                <span className="text-white font-bold text-sm">CW</span>
+                            <div className="w-8 h-8 rounded-xl">
+                                <span className="text-white font-bold text-sm">
+                                    <img src="./icon.png" alt="icon"/>
+                                </span>
                             </div>
                             <button 
                                 onClick={() => setIsSidebarOpen(true)}

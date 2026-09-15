@@ -91,6 +91,7 @@ const Calendar = () => {
                     progress: task.progress || 0,
                     assignedTo: task.assignedTo || [],
                     createdBy: task.createdBy,
+                    teamId: task.teamId
                 };
             });
     }, [tasks]);
@@ -242,9 +243,9 @@ const Calendar = () => {
         ? getEventsForDate(selectedDayMobile)
         : [];
 
-    const handleClick = (id) => {
+    const handleClick = (teamId, id) => {
         setSelectedEvent(null)
-        navigate(`/team/task/${id}`)
+        navigate(`/team/${teamId}/task/${id}`)
     }
 
     return (
@@ -758,6 +759,8 @@ const Calendar = () => {
                         isOverdue={isOverdue(selectedEvent)}
                     />
                 )}
+                {console.log(selectedEvent)
+                }
             </div>
         </>
     );
@@ -909,7 +912,7 @@ const EventModal = ({
 
                 {/* Actions */}
                 <div className="border-t border-slate-200/80 dark:border-slate-700/80 p-4 flex items-center gap-2">
-                <button className='flex-1 px-3 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors' onClick={() => handleClick(event.id)}>View</button>
+                <button className='flex-1 px-3 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors' onClick={() => handleClick(event.teamId, event.id)}>View</button>
                     {/* {event.status !== 'Completed' ? (
                         <>
                             {event.status === 'Pending' && (

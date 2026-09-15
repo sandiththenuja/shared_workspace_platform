@@ -8,6 +8,8 @@ import {
 import DashboardLayout from '../layout/DashboardLayout';
 import { useTask } from '../context/TaskContext';
 import { useTeam } from '../context/TeamContext';
+import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const Analytics = () => {
     const { tasks, getTasks, getTaskStatistics } = useTask();
@@ -123,6 +125,28 @@ const Analytics = () => {
         orange: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400',
     };
 
+    const handleDownloadUserReport = async() => {
+            try {
+            const response = await axios.get('/api/reports/export/users', {
+                responseType: "blob"
+            })
+    
+            // create url for blob
+            const url = window.URL.createObjectURL(new Blob([response.data]))
+            const link = document.createElement("a")
+            link.href = url
+            link.setAttribute("download", "user_details.xlsx")
+            document.body.appendChild(link)
+            link.click()
+            link.parentNode.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            } catch (error) {
+            console.error("Error downloading", error);
+            toast.error("Error to download try again")
+            
+            }
+        }
+
     if (loading) {
         return (
             <>
@@ -159,7 +183,8 @@ const Analytics = () => {
                             <span className="sm:hidden">7d</span>
                             <ArrowDown className="w-3.5 h-3.5 hidden sm:inline" />
                         </button>
-                        <button className="px-3.5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                        {}
+                        <button className="px-3.5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2" onClick={handleDownloadUserReport}>
                             <Download className="w-4 h-4" />
                             <span className="hidden sm:inline">Export Report</span>
                             <span className="sm:hidden">Export</span>

@@ -49,7 +49,7 @@ const Dashboard = () => {
     const [animated, setAnimated] = useState(false);
 
     const { authUser } = useAuth();
-    const { tasks, getTasks, getTaskStatistics, loading: taskLoading, getUserDashboardData, getDashboardData } = useTask();
+    const { tasks, getTasks, getTaskStatistics, loading: taskLoading, getUserDashboardData, handleDownloadReport } = useTask();
     const { teams, fetchTeams, loading: teamLoading } = useTeam();
 
     const chartRef = useRef(null);
@@ -182,10 +182,12 @@ const Dashboard = () => {
                             <Activity className="w-4 h-4" />
                             Refresh
                         </button>
-                        <button className="px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                        {isAdmin && (
+                            <button className="px-4 py-2 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2" onClick={handleDownloadReport}>
                             <Download className="w-4 h-4" />
                             Export
                         </button>
+                        )}
                     </div>
                 </div>
 

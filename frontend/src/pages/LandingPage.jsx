@@ -11,7 +11,10 @@ import {
   // Social
   GitBranch, Link, TestTube,
   // UI
-  Star
+  Star,
+  BrainCircuit,
+  PanelTopIcon,
+  Mail
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -36,9 +39,9 @@ const LandingPage = () => {
   ];
 
   const features = [
-    { icon: MessageSquare, title: 'Real-Time Chat', desc: 'Instant messaging with threads, reactions, and AI-powered smart replies.' },
-    { icon: ClipboardList, title: 'Task Boards', desc: 'Drag-and-drop kanban boards with task assignment, priority, and progress tracking.' },
-    { icon: Bot, title: 'AI Assistant', desc: 'AI-powered writing, summarization, and intelligent task suggestions.' },
+    { icon: MessageSquare, title: 'Real-Time Chat', desc: 'Instant messaging and empower with smart replies.' },
+    { icon: ClipboardList, title: 'Task Boards', desc: 'Task assignment, priority, and progress tracking.' },
+    { icon: Bot, title: 'Emails', desc: 'Automated emails to upgrade yout workflow.' },
     { icon: FolderOpen, title: 'File Management', desc: 'Organized file storage with folder structure, versioning, and previews.' },
     { icon: PenTool, title: 'Whiteboard', desc: 'Collaborative drawing and brainstorming with real-time updates.' },
     { icon: LineChart, title: 'Analytics & Reports', desc: 'Track team activity, productivity metrics, and export detailed reports.' }
@@ -68,8 +71,6 @@ const LandingPage = () => {
   const navLinks = [
     { label: 'Features', href: '#features' },
     { label: 'Testimonials', href: '#testimonials' },
-    { label: 'Pricing', href: '#pricing' },
-    { label: 'About', href: '#about' }
   ];
 
   return (
@@ -82,11 +83,12 @@ const LandingPage = () => {
       }`}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <a href="#" className="flex items-center gap-2.5 font-bold text-xl text-slate-900">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-              <Calculator className="w-4 h-4 text-white" />
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center">
+              {/* <Calculator className="w-4 h-4 text-white" /> */}
+              <img src="./icon.png" alt="icon"/>
             </span>
             <span className="bg-gradient-to-r from-slate-800 to-indigo-600 bg-clip-text text-transparent">
-              CollabNest
+              Converge
             </span>
           </a>
 
@@ -102,10 +104,10 @@ const LandingPage = () => {
           </ul>
 
           <div className="flex items-center gap-3">
-            <a href="#" className="hidden md:inline-block px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-full hover:border-indigo-400 hover:text-indigo-600 transition-all">
+            {/* <a href="#" className="hidden md:inline-block px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-full hover:border-indigo-400 hover:text-indigo-600 transition-all">
               Sign In
-            </a>
-            <button onClick={() => navigate('/login')} href="#" className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-md shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all">
+            </a> */}
+            <button onClick={() => navigate('/login')} className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-md shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all hidden md:block">
               Get Started
             </button>
             <button 
@@ -134,7 +136,7 @@ const LandingPage = () => {
                 </li>
               ))}
               <li className="pt-2 border-t border-slate-200/50">
-                <a href="#" className="block w-full py-2.5 text-center font-semibold text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors">
+                <a href="/login" className="block w-full py-2.5 text-center font-semibold text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors">
                   Sign In
                 </a>
               </li>
@@ -148,7 +150,7 @@ const LandingPage = () => {
         <div className="space-y-6">
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-xs font-medium text-slate-700">
-              <Rocket className="w-3 h-3 text-indigo-500" /> AI-Powered
+              <Rocket className="w-3 h-3 text-indigo-500" /> Automated
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-xs font-medium text-slate-700">
               <Users className="w-3 h-3 text-indigo-500" /> 500+ Teams
@@ -163,21 +165,21 @@ const LandingPage = () => {
           </h1>
 
           <p className="text-lg text-slate-500 max-w-lg leading-relaxed">
-            Chat, collaborate, and create — all in one place. AI-powered, real-time, and built for teams of any size.
+            Chat, collaborate, and create — all in one place. Automated, real-time, and built for teams of any size.
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <a href="#" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all">
+            <a href="/login" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all">
               Start Free Trial <ArrowRight className="w-4 h-4" />
             </a>
-            <a href="#" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-all">
+            <a href="/login" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-all">
               <Play className="w-4 h-4" /> See Demo
             </a>
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm text-slate-500">
             <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-500" /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-500" /> 14-day free trial</span>
+            <span className="flex items-center gap-1.5"><CheckCircle className="w-4 h-4 text-emerald-500" /> Free forever</span>
           </div>
         </div>
 
@@ -289,7 +291,7 @@ const LandingPage = () => {
             Join thousands of teams already using CollabNest to collaborate, create, and get work done.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <a href="#" className="inline-block px-8 py-3.5 rounded-full bg-white text-indigo-600 font-semibold hover:bg-slate-50 hover:-translate-y-0.5 transition-all">
+            <a href="/login" className="inline-block px-8 py-3.5 rounded-full bg-white text-indigo-600 font-semibold hover:bg-slate-50 hover:-translate-y-0.5 transition-all">
               Start Free Trial
             </a>
             <a href="#" className="inline-block px-8 py-3.5 rounded-full border border-white/30 text-white font-semibold hover:bg-white/10 transition-all">
@@ -304,37 +306,39 @@ const LandingPage = () => {
         <div className="grid md:grid-cols-4 gap-8">
           <div>
             <a href="#" className="flex items-center gap-2.5 font-bold text-xl text-slate-900 mb-3">
-              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <Calculator className="w-4 h-4 text-white" />
+              <span className="w-9 h-9 rounded-xl">
+                <img src="./icon.png" alt="icon"/>
               </span>
               <span className="bg-gradient-to-r from-slate-800 to-indigo-600 bg-clip-text text-transparent">
-                CollabNest
+                Converge
               </span>
             </a>
-            <p className="text-sm text-slate-500 max-w-xs">All-in-one workspace for modern teams. AI-powered collaboration, real-time communication, and project management.</p>
+            <p className="text-sm text-slate-500 max-w-xs">All-in-one workspace for modern teams. Team powered collaboration, real-time communication, and project management.</p>
             <div className="flex gap-3 mt-4">
-              <a href="#" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><X className="w-4 h-4" /></a>
-              <a href="#" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><GitBranch className="w-4 h-4" /></a>
-              <a href="#" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><Link className="w-4 h-4" /></a>
-              <a href="#" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><TestTube className="w-4 h-4" /></a>
+              <a href="https://github.com/sandiththenuja" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><GitBranch className="w-4 h-4" /></a>
+              <a href="https://sandiththenuja.vercel.app/www.linkedin.com/in/sandith-thenuja" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><BrainCircuit className="w-4 h-4" /></a>
+              <a href="https://www.instagram.com/sandiththenuja/" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><PanelTopIcon className="w-4 h-4" /></a>
+              <a href="mailto:sandiththenuja2005@gmail.com" className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-all"><Mail className="w-4 h-4" /></a>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-slate-900 mb-3">Product</h4>
             <ul className="space-y-2 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Features</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Pricing</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Changelog</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Roadmap</a></li>
+              <li><a href="#features" className="hover:text-indigo-500 transition-colors">Features</a></li>
+              <li><a href="#testimonials" className="hover:text-indigo-500 transition-colors">Testimonials</a></li>
+              {/* <li><a href="#" className="hover:text-indigo-500 transition-colors">Changelog</a></li>
+              <li><a href="#" className="hover:text-indigo-500 transition-colors">Roadmap</a></li> */}
             </ul>
           </div>
           <div>
             <h4 className="font-semibold text-slate-900 mb-3">Company</h4>
             <ul className="space-y-2 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-indigo-500 transition-colors">Contact</a></li>
+              <li><a href="#features" className="hover:text-indigo-500 transition-colors">About</a></li>
+              <li><a href="/privacy" target='_blank' className="hover:text-indigo-500 transition-colors">Privacy</a></li>
+              <li><a href="/terms" target='_blank' className="hover:text-indigo-500 transition-colors">Terms</a></li>
+              <li><a href="#" className="hover:text-indigo-500 transition-colors">Creator</a></li>
+              {/* <li><a href="#" className="hover:text-indigo-500 transition-colors">Careers</a></li>
+              <li><a href="#" className="hover:text-indigo-500 transition-colors">Contact</a></li> */}
             </ul>
           </div>
           <div>
@@ -348,11 +352,11 @@ const LandingPage = () => {
           </div>
         </div>
         <div className="mt-8 pt-6 border-t border-slate-200/50 flex flex-col md:flex-row justify-between items-center text-xs text-slate-400">
-          <span>&copy; 2025 CollabNest. All rights reserved.</span>
+          <span>&copy; 2026 Converge. All rights reserved.</span>
           <span className="flex gap-4 mt-2 md:mt-0">
-            <a href="#" className="hover:text-slate-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-slate-600 transition-colors">Terms</a>
-            <a href="#" className="hover:text-slate-600 transition-colors">Cookies</a>
+            <a href="/privacy" target='_blank' className="hover:text-slate-600 transition-colors">Privacy</a>
+            <a href="/terms" target='_blank' className="hover:text-slate-600 transition-colors">Terms</a>
+            {/* <a href="#" className="hover:text-slate-600 transition-colors">Cookies</a> */}
           </span>
         </div>
       </footer>

@@ -1,860 +1,34 @@
 // pages/Team.jsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-    UserPlus, Search, Filter, MoreVertical, 
-    Mail, Phone, Calendar, Star, Users,
-    ChevronDown, Grid, List, Award, Clock,
-    FolderOpen, UserX, Settings, Trash2,
-    Loader2, Plus, Building2, UserCheck,
-    AlertCircle, Shield, Eye, LogIn, Copy,
-    Image, Upload, Camera, X, Link2, Check,
-    User, AtSign, Send, FileText, Download as DownloadIcon,
-    Edit2, Save, RefreshCw, File, Folder,
-    Globe,
-    Lock,
-    ListTodo,
-    Pencil
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+    Plus, Building2, LogIn, Users, Search, Grid, List,
+    Loader2, AlertCircle, Lock, Globe, Shield, Eye,
+    ListTodo, Crown, ChevronRight,
 } from 'lucide-react';
-import DashboardLayout from '../layout/DashboardLayout';
 import { useTeam } from '../context/TeamContext';
 import { useAuth } from '../context/AuthContext';
 import { useTask } from '../context/TaskContext';
 import CreateTeamModal from '../components/modals/CreateTeamModal';
 import toast from 'react-hot-toast';
-import axios from 'axios';
-import { useSocket } from '../hooks/useSocket';
-
-import TeamFiles from '../components/TeamFiles';
-import TeamFileList from '../components/TeamFileList';
-import TaskCard from '../components/TaskCard';
-import TodoListInput from '../components/TodoListInput';
 import { useNavigate } from 'react-router-dom';
-import AddAttachmentsInput from '../components/AddAttachmentsInput';
 
 const Team = () => {
-    const [view, setView] = useState('grid');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedTeamId, setSelectedTeamId] = useState(null);
-    const [selectedTeam, setSelectedTeam] = useState(null);
-    const [showInviteModal, setShowInviteModal] = useState(false);
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [viewOnlyMode, setViewOnlyMode] = useState(false);
+    const navigate = useNavigate();
+    const { teams, fetchTeams, createTeam, joinTeamByInvite, loading: teamLoading } = useTeam();
+    const { authUser, token } = useAuth();
+    const {tasks} = useTask()
 
-    // Create team modal state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [view, setView] = useState('grid');
     const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
-
-    // Join team modal state
     const [showJoinModal, setShowJoinModal] = useState(false);
-    const [joinCode, setJoinCode] = useState('');
-    const [isJoining, setIsJoining] = useState(false);
-    const [joinError, setJoinError] = useState(null);
 
-    // Add member modal state
-    const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-    const [selectedUsers, setSelectedUsers] = useState([]);
-    const [userSearchTerm, setUserSearchTerm] = useState('');
-    const [allUsers, setAllUsers] = useState([]);
-    const [loadingUsers, setLoadingUsers] = useState(false);
-
-    // Task Modal State
-    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-    const [editingTask, setEditingTask] = useState(null);
-    const [taskForm, setTaskForm] = useState({
-        title: '', description: '', priority: 'Medium', status: 'Pending', 
-        dueDate: '', teamId: '', assignedTo: [], progress: 0
-    });
-
-    // Edit Team Modal State
-    const [showEditTeamModal, setShowEditTeamModal] = useState(false);
-    const [editTeamData, setEditTeamData] = useState({
-        name: '',
-        description: '',
-        isPrivate: false,
-        coverImg: null,
-        coverPreview: null
-    });
-    const [isUpdatingTeam, setIsUpdatingTeam] = useState(false);
-
-    // Team image state
-    const [teamImage, setTeamImage] = useState(null);
-    const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const fileInputRef = useRef(null);
-    const coverInputRef = useRef(null);
-
-    const [selectedImg, setSelectedImg] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(null);
-
-    const [fileUploaded, setFileUploaded] = useState(false);
-    const navigate = useNavigate()
-
-    const handleValueChange = (key, value) => {
-        setTaskForm((prevData) => ({...prevData, [key]: value}))
-    }
-
-    const handleFileUploaded = (updatedTeam) => {
-    if (updatedTeam) {
-        // Update selectedTeam with new files
-        setSelectedTeam(updatedTeam);
-        // Also update in teams array
-        setTeams(prev => 
-            prev.map(team => 
-                team._id === updatedTeam._id ? updatedTeam : team
-            )
-        );
-        toast.success('Files uploaded successfully!');
-    }
-    setFileUploaded(prev => !prev);
-};
-
-const handleFileDeleted = (fileId) => {
-    if (selectedTeam && selectedTeam.files) {
-        // Remove the deleted file from selectedTeam
-        const updatedFiles = selectedTeam.files.filter(f => 
-            (f._id || f.id) !== fileId
-        );
-        const updatedTeam = {
-            ...selectedTeam,
-            files: updatedFiles
-        };
-        setSelectedTeam(updatedTeam);
-        // Also update in teams array
-        setTeams(prev => 
-            prev.map(team => 
-                team._id === updatedTeam._id ? updatedTeam : team
-            )
-        );
-    }
-    setFileUploaded(prev => !prev);
-};
-
-    const { 
-        teams, 
-        setTeams,
-        fetchTeams, 
-        getTeamById,
-        addTeamMember,
-        removeTeamMember,
-        leaveTeam,
-        createTeam,
-        updateTeam,
-        deleteTeam,
-        joinTeamByInvite,
-        uploadTeamImage,
-        loading: teamLoading 
-    } = useTeam();
-    
-    const { authUser, token } = useAuth();
-    const { tasks, getTasks, createTask, updateTask, deleteTask, updateTaskStatus, updateTaskChecklist } = useTask();
-
-    // Add this line right below your other useEffect hooks to ensure tasks are loaded
-    const teamTasks = tasks.filter(task => (task.teamId?._id || task.teamId) === selectedTeamId);
-    console.log("tasks", tasks);
-    console.log("team tasks", teamTasks);
-    
-    // Check if user is authenticated
     useEffect(() => {
-        if (!authUser || !token) {
-            setError('Please login to view teams');
-            return;
-        }
-        setError(null);
+        if (authUser && token) fetchTeams();
     }, [authUser, token]);
 
-    // Fetch teams on mount
-    useEffect(() => {
-        const loadTeams = async () => {
-            if (!authUser || !token) return;
-            
-            setIsLoading(true);
-            setError(null);
-            try {
-                const result = await fetchTeams();
-                console.log('Teams fetched:', result);
-            } catch (err) {
-                console.error('Failed to fetch teams:', err);
-                setError('Failed to load teams. Please try again.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        
-        loadTeams();
-    }, [authUser, token]);
-    
-    const { socket } = useSocket(authUser?._id);
-    const [onlineUsers, setOnlineUsers] = useState([]);
-
-    useEffect(() => {
-        if (!socket) return;
-        const onOnline = (users) => setOnlineUsers(users || []);
-        socket.on('getOnlineUsers', onOnline);
-        return () => socket.off('getOnlineUsers', onOnline);
-    }, [socket]);
-
-    const privateTeams = teams.filter(team => team.isPrivate && team.createdBy === authUser._id);
-    console.log("private", privateTeams);
-
-    // Set first team as selected when teams load
-    useEffect(() => {
-        if (teams.length > 0 && !selectedTeamId) {
-            setSelectedTeamId(teams[0]._id);
-            loadTeamDetails(teams[0]._id);
-        }
-    }, [teams]);
-
-    // Load team details when selectedTeamId changes
-    useEffect(() => {
-        if (selectedTeamId) {
-            loadTeamDetails(selectedTeamId);
-        }
-    }, [selectedTeamId]);
-
-    // Open edit modal with team data
-    const openEditTeamModal = () => {
-    if (selectedTeam) {
-        setEditTeamData({
-            name: selectedTeam.name || '',
-            description: selectedTeam.description || '',
-            isPrivate: selectedTeam.isPrivate || false,
-            coverImg: selectedTeam.coverImg || null,  // Get from coverImg field
-            coverPreview: selectedTeam.coverImg || null
-        });
-        setShowEditTeamModal(true);
-    }
-};
-
-    // Handle cover image change
-    const handleCoverImageChange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-            toast.error('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
-            return;
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error('Image must be less than 5MB');
-            return;
-        }
-        
-        setSelectedImg(file);
-        setPreviewUrl(URL.createObjectURL(file));
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            setEditTeamData(prev => ({
-                ...prev,
-                coverImg: file,  // Store the file object
-                coverPreview: event.target.result  // Store the preview URL
-            }));
-        };
-        reader.readAsDataURL(file);
-    };
-
-    // Remove cover image
-    const removeCoverImage = () => {
-        // setEditTeamData(prev => ({
-        //     ...prev,
-        //     coverImage: null,
-        //     coverPreview: null
-        // }));
-        // if (coverInputRef.current) {
-        //     coverInputRef.current.value = '';
-        // }
-        setSelectedImg(null);
-        setPreviewUrl(null);
-
-        setEditTeamData(prev => ({
-            ...prev,
-            coverImg: null,
-            coverPreview: null
-        }));
-
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
-
-    // Handle update team
-    const handleUpdateTeam = async (e) => {
-    e.preventDefault();
-    
-    if (!editTeamData.name.trim()) {
-        toast.error('Team name is required');
-        return;
-    }
-
-    setIsUpdatingTeam(true);
-    setError(null);
-
-    try {
-        // Prepare update data as JSON
-        let updateData = {
-            name: editTeamData.name.trim(),
-            description: editTeamData.description.trim(),
-            isPrivate: editTeamData.isPrivate
-        };
-
-        // Handle cover image - use coverImg to match backend
-        if (editTeamData.coverImg) {
-            const reader = new FileReader()
-            const base64Image = await new Promise((resolve, reject) => {
-                reader.onload = () => resolve(reader.result)
-                reader.onerror = reject;
-                reader.readAsDataURL(editTeamData.coverImg);
-            })
-            updateData.coverImg = base64Image
-            // If it's a File object
-            // if (typeof editTeamData.coverImage === 'object' && editTeamData.coverImage.name) {
-            //     const reader = new FileReader();
-            //     const base64Image = await new Promise((resolve, reject) => {
-            //         reader.onload = () => resolve(reader.result);
-            //         reader.onerror = reject;
-            //         reader.readAsDataURL(editTeamData.coverImage);
-            //     });
-            //     updateData.coverImg = base64Image;  // Use coverImg (not coverImage)
-        } else if (typeof editTeamData.coverImg === 'string') {
-            updateData.coverImg = editTeamData.coverImg;
-        }
-            // If it's already a URL or base64 string
-            // else if (typeof editTeamData.coverImage === 'string') {
-            //     updateData.coverImg = editTeamData.coverImage;  // Use coverImg (not coverImage)
-            // }
-        // }
-
-        const result = await updateTeam(selectedTeam._id, updateData);
-            
-            if (result?.success) {
-                // setSuccess(true);
-                setShowEditTeamModal(false);
-                await loadTeamDetails(selectedTeam._id);
-                await fetchTeams();
-                toast.success('Team updated successfully!');
-                
-                // Navigate after a short delay to show success message
-                // setTimeout(() => {
-                //     navigate('/dashboard');
-                // }, 1500);
-                
-                console.log(result);
-            } else {
-                setError(result?.message || 'Failed to update profile');
-                toast.error(result?.message || 'Failed to update profile');
-            }
-
-        // console.log('Updating team with data:', updateData); // Debug log
-
-        // const result = await updateTeam(selectedTeam._id, updateData);
-        
-        // if (result) {
-        //     setShowEditTeamModal(false);
-        //     await loadTeamDetails(selectedTeam._id);
-        //     await fetchTeams();
-        //     toast.success('Team updated successfully!');
-        // }
-    } catch (err) {
-        console.error('Failed to update team:', err);
-        setError(err.response?.data?.message || 'Failed to update team. Please try again.');
-        toast.error('Failed to update team');
-    } finally {
-        setIsUpdatingTeam(false);
-    }
-};
-
-    const loadTeamDetails = async (teamId) => {
-        if (!teamId) return;
-        
-        setIsLoading(true);
-        setError(null);
-        setViewOnlyMode(false);
-        
-        try {
-            const team = await getTeamById(teamId);
-            if (team) {
-                console.log('Team loaded:', team);
-                setSelectedTeam(team);
-                setTeamImage(team.coverImg || null);
-                
-                // Check if user is a member
-                const isMember = checkIfUserIsMember(team);
-                if (!isMember) {
-                    setViewOnlyMode(true);
-                    setError('You are viewing this team as a guest. Some actions may be limited.');
-                }
-                
-            } else {
-                setError('Failed to load team details');
-                setSelectedTeam(null);
-            }
-        } catch (err) {
-            console.error('Failed to load team details:', err);
-            if (err.response?.status === 403) {
-                setViewOnlyMode(true);
-                setError('You are not a member of this team. Viewing in read-only mode.');
-            } else {
-                setError('Failed to load team details. Please try again.');
-            }
-            setSelectedTeam(null);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Check if user is a member of the team
-    const checkIfUserIsMember = (team) => {
-        if (!team || !authUser) return false;
-        if (!team.members || !Array.isArray(team.members)) return false;
-        
-        const userId = authUser._id;
-        
-        // Check if user is the creator (creator is always a member)
-        if (team.createdBy) {
-            const creatorId = team.createdBy._id || team.createdBy;
-            if (creatorId.toString() === userId.toString()) {
-                return true;
-            }
-        }
-        
-        // Check if user is in members list
-        return team.members.some(member => {
-            const memberId = member._id || member.user?._id || member;
-            return memberId.toString() === userId.toString();
-        });
-    };
-
-    // Handle team selection
-    const handleTeamSelect = (teamId) => {
-        setSelectedTeamId(teamId);
-        setError(null);
-        setViewOnlyMode(false);
-    };
-
-    // Handle create team
-    const handleCreateTeam = async (teamData) => {
-        setIsCreating(true);
-        
-        try {
-            const response = await createTeam(teamData);
-            await fetchTeams();
-            
-            const newTeamId = response?._id || response?.team?._id;
-            if (newTeamId) {
-                setSelectedTeamId(newTeamId);
-                await loadTeamDetails(newTeamId);
-            }
-            
-            setShowCreateTeamModal(false);
-            toast.success('Team created successfully!');
-            
-            return response;
-        } catch (err) {
-            console.error('Failed to create team:', err);
-            const errorMessage = 
-                err.response?.data?.message || 
-                err.message || 
-                'Failed to create team. Please try again.';
-            throw new Error(errorMessage);
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    // Handle join team by invite code
-    const handleJoinTeam = async (e) => {
-        e.preventDefault();
-        
-        if (!joinCode.trim()) {
-            setJoinError('Please enter an invite code');
-            return;
-        }
-
-        setIsJoining(true);
-        setJoinError(null);
-
-        try {
-            const response = await joinTeamByInvite(joinCode.trim().toUpperCase());
-            
-            if (response) {
-                setJoinCode('');
-                setShowJoinModal(false);
-                await fetchTeams();
-                
-                const joinedTeamId = response._id || response.team?._id;
-                if (joinedTeamId) {
-                    setSelectedTeamId(joinedTeamId);
-                    await loadTeamDetails(joinedTeamId);
-                }
-                
-                toast.success('Successfully joined the team!');
-            }
-        } catch (err) {
-            console.error('Failed to join team:', err);
-            const errorMessage = 
-                err.response?.data?.message || 
-                'Invalid invite code. Please check and try again.';
-            setJoinError(errorMessage);
-        } finally {
-            setIsJoining(false);
-        }
-    };
-
-    const fetchAllUsers = async () => {
-        setLoadingUsers(true);
-        try {
-            const response = await axios.get('/api/auth/users');
-            const data = response.data
-            
-            let usersList = [];
-            if (data && data.success && Array.isArray(data.users)) {
-                usersList = data.users;
-            } else if (data && Array.isArray(data)) {
-                usersList = data;
-            } else if (data && data.data && Array.isArray(data.data)) {
-                usersList = data.data;
-            } else {
-                usersList = data?.users || data?.data || [];
-            }
-            
-            if (!Array.isArray(usersList)) {
-                usersList = [];
-            }
-            
-            const existingMemberIds = selectedTeam?.members?.map(m => m._id || m) || [];
-            const filteredUsers = usersList.filter(user => 
-                user && user._id !== authUser?._id && 
-                !existingMemberIds.includes(user._id)
-            );
-            
-            setAllUsers(filteredUsers);
-            
-        } catch (error) {
-            console.error('Failed to fetch users:', error);
-            toast.error(error.response?.data?.message || 'Failed to load users');
-        } finally {
-            setLoadingUsers(false);
-        }
-    };
-
-    // ===== OPEN ADD MEMBER MODAL =====
-    const openAddMemberModal = async () => {
-        setShowAddMemberModal(true);
-        setSelectedUsers([]);
-        setUserSearchTerm('');
-        await fetchAllUsers();
-    };
-
-    // ===== TOGGLE USER SELECTION =====
-    const toggleUserSelection = (userId) => {
-        setSelectedUsers(prev => {
-            if (prev.includes(userId)) {
-                return prev.filter(id => id !== userId);
-            } else {
-                return [...prev, userId];
-            }
-        });
-    };
-
-    // ===== SELECT ALL USERS =====
-    const selectAllUsers = () => {
-        const allUserIds = filteredUsers.map(user => user._id);
-        setSelectedUsers(allUserIds);
-    };
-
-    // ===== DESELECT ALL USERS =====
-    const deselectAllUsers = () => {
-        setSelectedUsers([]);
-    };
-
-    // ===== ADD SELECTED USERS TO TEAM =====
-    const handleAddSelectedUsers = async () => {
-        if (selectedUsers.length === 0) {
-            toast.error('Please select at least one user');
-            return;
-        }
-
-        setIsLoading(true);
-        let successCount = 0;
-        const failedUsers = [];
-
-        for (const userId of selectedUsers) {
-            try {
-                const user = allUsers.find(u => u._id === userId);
-                if (user) {
-                    const result = await addTeamMember(selectedTeam._id, user.email);
-                    if (result) {
-                        successCount++;
-                    } else {
-                        failedUsers.push(user.fullName || user.email);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to add user:', error);
-                const user = allUsers.find(u => u._id === userId);
-                failedUsers.push(user?.fullName || user?.email || 'Unknown user');
-            }
-        }
-
-        if (successCount > 0) {
-            toast.success(`Added ${successCount} member${successCount > 1 ? 's' : ''} successfully!`);
-            if (failedUsers.length > 0) {
-                toast.error(`Failed to add: ${failedUsers.join(', ')}`);
-            }
-            setShowAddMemberModal(false);
-            await loadTeamDetails(selectedTeam._id);
-            await fetchTeams();
-        } else {
-            toast.error('Failed to add members. Please try again.');
-        }
-        setIsLoading(false);
-    };
-
-    // Handle invite member by email
-    const handleInviteMember = async (e) => {
-        e.preventDefault();
-        if (!selectedTeam || !inviteEmail) return;
-
-        if (viewOnlyMode) {
-            setError('You are in view-only mode. Cannot invite members.');
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const result = await addTeamMember(selectedTeam._id, inviteEmail);
-            if (result) {
-                setInviteEmail('');
-                setShowInviteModal(false);
-                await loadTeamDetails(selectedTeam._id);
-                await fetchTeams();
-                toast.success('Member invited successfully!');
-            }
-        } catch (err) {
-            console.error('Failed to invite member:', err);
-            setError(err.response?.data?.message || 'Failed to invite member. Please try again.');
-            toast.error('Failed to invite member');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Handle remove member
-    const handleRemoveMember = async (memberId, memberName) => {
-        if (!selectedTeam) return;
-        
-        if (viewOnlyMode) {
-            setError('You are in view-only mode. Cannot remove members.');
-            return;
-        }
-        
-        if (!window.confirm(`Are you sure you want to remove ${memberName} from the team?`)) {
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const result = await removeTeamMember(selectedTeam._id, memberId);
-            if (result) {
-                await loadTeamDetails(selectedTeam._id);
-                await fetchTeams();
-                toast.success('Member removed successfully!');
-            }
-        } catch (err) {
-            console.error('Failed to remove member:', err);
-            setError(err.response?.data?.message || 'Failed to remove member. Please try again.');
-            toast.error('Failed to remove member');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Handle team image upload
-    const handleImageUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !selectedTeam) return;
-
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-            toast.error('Please upload a valid image file (JPEG, PNG, GIF, or WebP)');
-            return;
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error('Image must be less than 5MB');
-            return;
-        }
-
-        if (viewOnlyMode) {
-            setError('You are in view-only mode. Cannot update team image.');
-            return;
-        }
-
-        setIsUploadingImage(true);
-
-        try {
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const result = await uploadTeamImage(selectedTeam._id, formData);
-            if (result) {
-                setTeamImage(result.image || result.url);
-                await loadTeamDetails(selectedTeam._id);
-                toast.success('Team image updated successfully!');
-            }
-        } catch (err) {
-            console.error('Failed to upload image:', err);
-            toast.error('Failed to upload image. Please try again.');
-        } finally {
-            setIsUploadingImage(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
-    // Copy invite code to clipboard
-    const copyInviteCode = () => {
-        if (selectedTeam?.inviteCode) {
-            navigator.clipboard.writeText(selectedTeam.inviteCode);
-            toast.success('Invite code copied to clipboard!');
-        }
-    };
-
-    // Copy team link
-    const copyTeamLink = () => {
-        if (selectedTeam?.inviteCode) {
-            const link = `${window.location.origin}/join-team/${selectedTeam.inviteCode}`;
-            navigator.clipboard.writeText(link);
-            toast.success('Team link copied to clipboard!');
-        }
-    };
-
-    // Handle leave team
-    const handleLeaveTeam = async () => {
-        if (!selectedTeam) return;
-        
-        if (viewOnlyMode) {
-            setError('You are in view-only mode. Cannot leave the team.');
-            return;
-        }
-        
-        if (!window.confirm(`Are you sure you want to leave "${selectedTeam.name}"?`)) {
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const result = await leaveTeam(selectedTeam._id);
-            if (result) {
-                setSelectedTeam(null);
-                setSelectedTeamId(null);
-                await fetchTeams();
-                if (teams.length > 0) {
-                    setSelectedTeamId(teams[0]._id);
-                }
-                toast.success('You have left the team successfully!');
-            }
-        } catch (err) {
-            console.error('Failed to leave team:', err);
-            setError(err.response?.data?.message || 'Failed to leave team. Please try again.');
-            toast.error('Failed to leave team');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Handle delete team
-    const handleDeleteTeam = async () => {
-        if (!selectedTeam) return;
-        
-        if (viewOnlyMode) {
-            setError('You are in view-only mode. Cannot delete the team.');
-            return;
-        }
-        
-        if (!window.confirm(`Are you sure you want to delete "${selectedTeam.name}"? This action cannot be undone.`)) {
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            const result = await deleteTeam(selectedTeam._id);
-            if (result) {
-                setSelectedTeam(null);
-                setSelectedTeamId(null);
-                await fetchTeams();
-                toast.success('Team deleted successfully!');
-            }
-            
-        } catch (err) {
-            console.error('Failed to delete team:', err);
-            setError(err.response?.data?.message || 'Failed to delete team. Please try again.');
-            toast.error('Failed to delete team');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Check if current user is team admin
-    const isTeamAdmin = () => {
-        if (!selectedTeam || !authUser) return false;
-        if (!selectedTeam.createdBy) return false;
-        
-        try {
-            const adminId = selectedTeam.createdBy._id || selectedTeam.createdBy;
-            const userId = authUser._id;
-            return adminId.toString() === userId.toString();
-        } catch (err) {
-            console.error('Error checking admin status:', err);
-            return false;
-        }
-    };
-    
-
-    // Get members with online status
-    const getMembersWithStatus = () => {
-        if (!selectedTeam) return [];
-        return selectedTeam.members || [];
-    };
-
-    // Filter members by search
-    const filteredMembers = getMembersWithStatus().filter(member => {
-        if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
-        const name = member.fullName || member.name || '';
-        const email = member.email || '';
-        return (
-            name.toLowerCase().includes(search) ||
-            email.toLowerCase().includes(search)
-        );
-    });
-
-    // Filter users for add member modal
-    const filteredUsers = allUsers.filter(user => {
-        if (!userSearchTerm) return true;
-        const search = userSearchTerm.toLowerCase();
-        return (
-            user.fullName?.toLowerCase().includes(search) ||
-            user.email?.toLowerCase().includes(search)
-        );
-    });
-
-    // Check if user is a member
-    const isUserMember = selectedTeam ? checkIfUserIsMember(selectedTeam) : false;
-
-    // Get team initials for avatar fallback
+    // ===== helpers =====
     const getTeamInitials = (name) => {
         if (!name) return 'T';
         const words = name.trim().split(/\s+/);
@@ -862,175 +36,75 @@ const handleFileDeleted = (fileId) => {
         return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
     };
 
-    // ============ TASK CRUD HANDLERS ============
-    const openCreateTaskModal = () => {
-        setEditingTask(null);
-        setTaskForm({
-            title: '', description: '', priority: 'Low',
-            dueDate: null, teamId: selectedTeamId, assignedTo: [], todoChecklist: [], attachments: []
-        });
-        setIsTaskModalOpen(true);
-    };
+    const getMemberId = (m) => (m?._id || m?.user?._id || m)?.toString();
 
-    const openEditTaskModal = (task) => {
-        setEditingTask(task);
-        setTaskForm({
-            title: task.title || '',
-            description: task.description || '',
-            priority: task.priority || 'Medium',
-            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-            teamId: task.teamId?._id || task.teamId || selectedTeamId,
-            assignedTo: task.assignedTo?.map(u => u._id) || [],
-            todoChecklist: task.todoChecklist,
-            attachments: task.attachments
-        });
-        setIsTaskModalOpen(true);
-    };
-
-    const handleTaskSubmit = async (e) => {
-        e.preventDefault();
-        if (!taskForm.title.trim()) return toast.error('Task title is required');
-
-        if (!selectedTeamId) {
-            toast.error('No team selected. Please select a team first.');
-            return;
+    const checkIfUserIsMember = (team) => {
+        if (!team || !authUser) return false;
+        const uid = authUser._id.toString();
+        if (team.createdBy) {
+            const creatorId = (team.createdBy._id || team.createdBy).toString();
+            if (creatorId === uid) return true;
         }
-        
+        return (team.members || []).some((m) => getMemberId(m) === uid);
+    };
+
+    const isTeamAdmin = (team) => {
+        if (!team?.createdBy || !authUser) return false;
+        const creatorId = (team.createdBy._id || team.createdBy).toString();
+        return creatorId === authUser._id.toString();
+    };
+
+    // ===== derived =====
+    const filteredTeams = useMemo(() => {
+        if (!searchTerm) return teams;
+        const s = searchTerm.toLowerCase();
+        return teams.filter(
+            (t) =>
+                t.name?.toLowerCase().includes(s) ||
+                t.description?.toLowerCase().includes(s)
+        );
+    }, [teams, searchTerm]);
+
+    // ===== handlers =====
+    const handleCreateTeam = async (teamData) => {
+        setIsCreating(true);
         try {
-            const formattedTodoChecklist = (taskForm.todoChecklist || []).map((item) => {
-            // If item is a string, convert to object
-            if (typeof item === 'string') {
-                return { text: item, completed: false };
-            }
-            // If item is already an object, ensure it has the right structure
-            return {
-                text: item.text || '',
-                completed: item.completed || false
-            };
-        });
-        const taskData = {
-            title: taskForm.title.trim(),
-            description: taskForm.description?.trim() || '',
-            priority: taskForm.priority || 'Medium',
-            dueDate: taskForm.dueDate || null,
-            teamId: selectedTeamId,  // ✅ Make sure teamId is included
-            assignedTo: taskForm.assignedTo || [],
-            todoChecklist: formattedTodoChecklist,  // ✅ Use "todoChecklist" (not "todoCheckList")
-            attachments: taskForm.attachments || []
-        };
-
-        console.log('📤 Sending task data:', taskData);  // ✅ Debug log
-
-            if (editingTask) {
-                await axios.put(`/api/tasks/${editingTask._id}`, taskForm);
-                toast.success('Task updated successfully');
-            } else {
-                await axios.post('/api/tasks', taskData);
-                toast.success('Task created successfully');
-            }
-            await getTasks();
-            setIsTaskModalOpen(false);
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to save task');
+            const response = await createTeam(teamData);
+            await fetchTeams();
+            const newTeamId = response?._id || response?.team?._id;
+            setShowCreateTeamModal(false);
+            toast.success('Team created successfully!');
+            if (newTeamId) navigate(`/team/${newTeamId}`);
+            return response;
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message || 'Failed to create team';
+            throw new Error(msg);
+        } finally {
+            setIsCreating(false);
         }
     };
 
-    const handleDeleteTask = async (taskId) => {
-        if (!window.confirm('Are you sure you want to delete this task?')) return;
-        try {
-            await axios.delete(`/api/tasks/${taskId}`);
-            await getTasks();
-            toast.success('Task deleted');
-        } catch (error) {
-            toast.error('Failed to delete task');
-        }
+    const handleJoinTeam = async (inviteCode) => {
+        const response = await joinTeamByInvite(inviteCode.trim().toUpperCase());
+        await fetchTeams();
+        const joinedId = response?._id || response?.team?._id;
+        if (joinedId) navigate(`/team/${joinedId}`);
     };
 
-    const handleProgressChange = async (taskId, newProgress) => {
-        try {
-            const status = newProgress === 100 ? 'Completed' : newProgress > 0 ? 'In Progress' : 'Pending';
-            await axios.put(`/api/tasks/${taskId}/status`, { progress: newProgress, status });
-            await getTasks();
-        } catch (error) {
-            toast.error('Failed to update progress');
-        }
-    };
-
-    // pages/Team.jsx - Fix the updateTodoChecklist function
-
-    // ✅ FIXED: Proper updateTodoChecklist function
-    const updateTodoChecklist = async (taskId, index) => {
-        // Find the task in teamTasks
-        const task = teamTasks.find(t => t._id === taskId);
-        if (!task) {
-            toast.error('Task not found');
-            return;
-        }
-
-        // Create a copy of the todo checklist
-        const todoChecklist = [...(task.todoChecklist || [])];
-        
-        // Toggle the completed status
-        if (todoChecklist && todoChecklist[index]) {
-            todoChecklist[index].completed = !todoChecklist[index].completed;
-        } else {
-            toast.error('Todo item not found');
-            return;
-        }
-
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.put(
-                `/api/tasks/${taskId}/todo`,
-                { todoChecklist },
-                {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (response.status === 200 || response.data.success) {
-                // Refresh tasks
-                await getTasks();
-                toast.success('Todo checklist updated');
-            } else {
-                // Revert the change
-                todoChecklist[index].completed = !todoChecklist[index].completed;
-                toast.error('Failed to update todo checklist');
-            }
-        } catch (error) {
-            // Revert the change on error
-            todoChecklist[index].completed = !todoChecklist[index].completed;
-            console.error('Error updating todo checklist:', error);
-            toast.error(error.response?.data?.message || 'Failed to update todo checklist');
-        }
-    };
-
-    const handleClick = (taskId) => {
-        navigate(`/team/task/${taskId}`)
-    }
-
-
-    // Loading state
+    // ===== loading / auth =====
     if (teamLoading && teams.length === 0) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center h-96">
-                    <div className="flex flex-col items-center gap-4">
-                        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                        <p className="text-slate-500 dark:text-slate-400">Loading teams...</p>
-                    </div>
+                    <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
-    // Not authenticated
     if (!authUser || !token) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex flex-col items-center justify-center h-96">
                     <div className="w-20 h-20 rounded-full bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center mb-4">
                         <AlertCircle className="w-10 h-10 text-amber-600 dark:text-amber-400" />
@@ -1042,11 +116,11 @@ const handleFileDeleted = (fileId) => {
                         Please login to view your teams and collaborate with colleagues.
                     </p>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
-    // No teams state
+    // ===== empty state =====
     if (teams.length === 0 && !teamLoading) {
         return (
             <>
@@ -1061,43 +135,31 @@ const handleFileDeleted = (fileId) => {
                         Create your first team or join an existing one to start collaborating.
                     </p>
                     <div className="flex items-center gap-3">
-                        <button 
+                        <button
                             onClick={() => setShowCreateTeamModal(true)}
                             className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2"
                         >
-                            <Plus className="w-4 h-4" />
-                            Create Team
+                            <Plus className="w-4 h-4" /> Create Team
                         </button>
-                        <button 
+                        <button
                             onClick={() => setShowJoinModal(true)}
                             className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
                         >
-                            <LogIn className="w-4 h-4" />
-                            Join Team
+                            <LogIn className="w-4 h-4" /> Join Team
                         </button>
                     </div>
                 </div>
-                {/* Join Team Modal */}
-                <JoinTeamModal 
-                    isOpen={showJoinModal}
-                    onClose={() => {
-                        setShowJoinModal(false);
-                        setJoinError(null);
-                        setJoinCode('');
-                    }}
-                    onSubmit={handleJoinTeam}
-                    joinCode={joinCode}
-                    setJoinCode={setJoinCode}
-                    isJoining={isJoining}
-                    error={joinError}
-                    setError={setJoinError}
-                />
-                {/* Create Team Modal */}
+
                 <CreateTeamModal
                     isOpen={showCreateTeamModal}
                     onClose={() => setShowCreateTeamModal(false)}
                     onCreateTeam={handleCreateTeam}
                     isCreating={isCreating}
+                />
+                <JoinTeamModal
+                    isOpen={showJoinModal}
+                    onClose={() => setShowJoinModal(false)}
+                    onSubmit={handleJoinTeam}
                 />
             </>
         );
@@ -1105,1288 +167,307 @@ const handleFileDeleted = (fileId) => {
 
     return (
         <>
-            <div className="space-y-6">
-                {/* Error Display */}
-                {error && (
-                    <div className={`rounded-lg p-4 flex items-start gap-3 ${
-                        viewOnlyMode && !error.includes('Failed') 
-                            ? 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20'
-                            : 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20'
-                    }`}>
-                        {viewOnlyMode ? (
-                            <Eye className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                        ) : (
-                            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                            <p className={viewOnlyMode ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>
-                                {error}
-                            </p>
-                            <button 
-                                onClick={() => setError(null)}
-                                className="text-sm hover:underline mt-1"
-                            >
-                                Dismiss
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* View-Only Mode Banner */}
-                {viewOnlyMode && !error && (
-                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg p-4 flex items-start gap-3">
-                        <Eye className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <p className="text-amber-600 dark:text-amber-400">
-                                You are viewing this team in read-only mode. You are not a member of this team.
-                            </p>
-                            <p className="text-sm text-amber-500 dark:text-amber-400/70 mt-1">
-                                To collaborate, request to join the team or contact the team admin.
-                            </p>
-                        </div>
-                    </div>
-                )}
-
+            <div className="space-y-5 md:space-y-6 pb-8">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">Teams</h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-1">
-                            {teams.length} team{teams.length > 1 ? 's' : ''} • 
-                            {selectedTeam && ` ${selectedTeam.members?.length || 0} members`}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">
+                            Teams
+                        </h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Member of {teams.length} team{teams.length !== 1 ? 's' : ''}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button 
+                        <button
                             onClick={() => setShowJoinModal(true)}
-                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
+                            className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2"
                         >
                             <LogIn className="w-4 h-4" />
-                            Join Team
+                            <span className="hidden sm:inline">Join Team</span>
                         </button>
-                        <button 
+                        <button
                             onClick={() => setShowCreateTeamModal(true)}
-                            className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2"
+                            className="px-3.5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2"
                         >
                             <Plus className="w-4 h-4" />
-                            Create Team
+                            <span className="hidden sm:inline">Create Team</span>
+                            <span className="sm:hidden">New</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Team Selector & Search */}
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                    <div className="flex flex-wrap gap-2">
-                        {teams.map((team) => {
-                            const isMember = checkIfUserIsMember(team);
-                            const teamImg = team.image || null;
-                            return (    
-                                <button
-                                    key={team._id}
-                                    onClick={() => handleTeamSelect(team._id)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                        selectedTeamId === team._id
-                                            ? 'bg-indigo-600 text-white'
-                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
-                                    }`}
-                                >
-                                    {teamImg ? (
-                                        <img 
-                                            src={teamImg} 
-                                            alt={team.name} 
-                                            className="w-5 h-5 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                                            selectedTeamId === team._id
-                                                ? 'bg-indigo-500 text-white'
-                                                : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'
-                                        }`}>
-                                            {getTeamInitials(team.name)}
-                                        </div>
-                                    )}
-                                    <span className="max-w-[120px] truncate">{team.name}</span>
-                                    {!isMember && (
-                                        <Eye className="w-3 h-3 text-slate-400" />
-                                    )}
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                        selectedTeamId === team._id
-                                            ? 'bg-indigo-500 text-white'
-                                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                    }`}>
-                                        {team.members?.length || 0}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                {/* Search + view toggle */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search teams..."
+                            className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
                     </div>
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="relative flex-1 sm:flex-initial">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input 
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search members..."
-                                className="w-full sm:w-48 pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                        <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                            <button 
-                                onClick={() => setView('grid')}
-                                className={`p-2 transition-colors ${view === 'grid' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <Grid className="w-4 h-4" />
-                            </button>
-                            <button 
-                                onClick={() => setView('list')}
-                                className={`p-2 transition-colors ${view === 'list' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <List className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Team Details & Members */}
-                {selectedTeam && (
-                    <>
-                        {/* Team Info Card */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-5">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    {/* Team Image with Upload */}
-                                    <div className="relative group">
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageUpload}
-                                            className="hidden"
-                                            id="team-image-upload"
-                                        />
-                                        {teamImage ? (
-                                            <div className="relative w-16 h-16 rounded-xl overflow-hidden">
-                                                <img 
-                                                    src={teamImage} 
-                                                    alt={selectedTeam.name} 
-                                                    className="w-full h-full object-cover"
-                                                />
-                                                {!viewOnlyMode && isTeamAdmin() && (
-                                                    <label
-                                                        htmlFor="team-image-upload"
-                                                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                                    >
-                                                        {isUploadingImage ? (
-                                                            <Loader2 className="w-6 h-6 text-white animate-spin" />
-                                                        ) : (
-                                                            <Camera className="w-6 h-6 text-white" />
-                                                        )}
-                                                    </label>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl relative">
-                                                {getTeamInitials(selectedTeam.name)}
-                                                {!viewOnlyMode && isTeamAdmin() && (
-                                                    <label
-                                                        htmlFor="team-image-upload"
-                                                        className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                                    >
-                                                        {isUploadingImage ? (
-                                                            <Loader2 className="w-6 h-6 text-white animate-spin" />
-                                                        ) : (
-                                                            <Upload className="w-5 h-5 text-white" />
-                                                        )}
-                                                    </label>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                            {selectedTeam.name}
-                                            {!isUserMember && (
-                                                <span className="text-xs bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">
-                                                    View Only
-                                                </span>
-                                            )}
-                                            {isTeamAdmin() && (
-                                                <span className="text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full">
-                                                    Admin
-                                                </span>
-                                            )}
-                                        </h2>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            {selectedTeam.description || 'No description'}
-                                        </p>
-                                        {!isTeamAdmin() && (
-                                            <p className='text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-2 rounded-full'>Admin - {selectedTeam.createdBy.fullName}</p>
-                                        )}
-                                        <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500 dark:text-slate-400">
-                                            <span className="flex items-center gap-1">
-                                                <Users className="w-4 h-4" />
-                                                {selectedTeam.members?.length === 1 ? `${selectedTeam.members?.length} member` : `${selectedTeam.members?.length || 0} members`}
-                                            </span>
-                                            {/* Only show invite code to admins */}
-                                            {selectedTeam.inviteCode && isTeamAdmin() && (
-                                                <>
-                                                    <span className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs">
-                                                        Code: {selectedTeam.inviteCode}
-                                                    </span>
-                                                    <button 
-                                                        onClick={copyInviteCode}
-                                                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                                                        title="Copy invite code"
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button 
-                                                        onClick={copyTeamLink}
-                                                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                                                        title="Copy invite link"
-                                                    >
-                                                        <Link2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {!viewOnlyMode && isTeamAdmin() && (
-                                        <>
-                                            <button 
-                                                onClick={openEditTeamModal}
-                                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition-colors flex items-center gap-1"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                                Edit Team
-                                            </button>
-                                            <button 
-                                                onClick={openAddMemberModal}
-                                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 transition-colors flex items-center gap-1"
-                                            >
-                                                <UserPlus className="w-4 h-4" />
-                                                Add Members
-                                            </button>
-                                            <button 
-                                                onClick={handleDeleteTeam}
-                                                className="px-3 py-1.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center gap-1"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                Delete
-                                            </button>
-                                        </>
-                                    )}
-                                    {!viewOnlyMode && !isTeamAdmin() && isUserMember && (
-                                        <button 
-                                            onClick={handleLeaveTeam}
-                                            className="px-3 py-1.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center gap-1"
-                                        >
-                                            <UserX className="w-4 h-4" />
-                                            Leave
-                                        </button>
-                                    )}
-                                    {viewOnlyMode && isUserMember && (
-                                        <button 
-                                            onClick={handleLeaveTeam}
-                                            className="px-3 py-1.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors flex items-center gap-1"
-                                        >
-                                            <UserX className="w-4 h-4" />
-                                            Leave
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Team Stats */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Total Members</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                                    {selectedTeam.members?.length || 0}
-                                </p>
-                            </div>
-                            {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Projects</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{teamTasks.length}</p>
-                            </div> */}
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Tasks</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{teamTasks.length}</p>
-                            </div>
-                            {/* <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4">
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Online</p>
-                                <p className="text-2xl font-bold text-emerald-500">
-                                    {selectedTeam.members?.filter(m => m.isOnline).length || 0}
-                                </p>
-                            </div> */}
-                        </div>
-
-                        {/* Members List */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
-                                <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Users className="w-5 h-5" />
-                                    Team Members
-                                    <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                                        ({filteredMembers.length})
-                                    </span>
-                                </h3>
-                                {!viewOnlyMode && isTeamAdmin() && (
-                                    <button 
-                                        onClick={openAddMemberModal}
-                                        className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                                    >
-                                        <UserPlus className="w-4 h-4" />
-                                        Add Members
-                                    </button>
-                                )}
-                            </div>
-
-                            {filteredMembers.length === 0 ? (
-                                <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                                    <p>No members found</p>
-                                    {searchTerm && (
-                                        <p className="text-sm mt-1">Try adjusting your search</p>
-                                    )}
-                                </div>
-                            ) : view === 'grid' ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                                    {filteredMembers.map((member) => {
-                                        const memberId = member._id || member.user?._id || member;
-                                        const memberName = member.fullName || member.name || 'Unknown';
-                                        const memberEmail = member.email || '';
-                                        const memberAvatar = member.avatar || member.profilePic || null;
-                                        const isOnline = onlineUsers.includes(memberId);
-                                        const isCurrentUser = memberId.toString() === authUser?._id?.toString();
-                                        const isAdmin = member.role === 'admin' || member.role === 'Admin';
-                                        
-                                        return (
-                                            <div key={memberId} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 hover:shadow-md transition-shadow">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="relative">
-                                                            {memberAvatar ? (
-                                                                <img 
-                                                                    src={memberAvatar} 
-                                                                    alt={memberName}
-                                                                    className="w-12 h-12 rounded-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-                                                                    {memberName.charAt(0).toUpperCase()}
-                                                                </div>
-                                                            )}
-                                                            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
-                                                                isOnline ? 'bg-emerald-400' : 'bg-slate-400'
-                                                            }`}></div>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-slate-800 dark:text-white text-sm flex items-center gap-1">
-                                                                {memberName}
-                                                                {isCurrentUser && (
-                                                                    <span className="text-xs text-indigo-500">(You)</span>
-                                                                )}
-                                                            </p>
-                                                            {isTeamAdmin() ? 
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                    {memberEmail}
-                                                                </p> : ""
-                                                            }
-                                                            <div className="flex items-center gap-1 mt-1">
-                                                                {isAdmin && (
-                                                                    <span className="text-xs px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full">
-                                                                        Admin
-                                                                    </span>
-                                                                )}
-                                                                {!isAdmin && (
-                                                                    <span className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full">
-                                                                        Member
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {!viewOnlyMode && isTeamAdmin() && !isCurrentUser && (
-                                                        <button 
-                                                            onClick={() => handleRemoveMember(memberId, memberName)}
-                                                            className="text-red-400 hover:text-red-600 transition-colors"
-                                                            title="Remove member"
-                                                        >
-                                                            <UserX className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Member</th>
-
-                                                {isTeamAdmin() ? 
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th> : ""
-                                                }
-
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                                                {!viewOnlyMode && isTeamAdmin() && (
-                                                    <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {filteredMembers.map((member) => {
-                                                const memberId = member._id || member.user?._id || member;
-                                                const memberName = member.fullName || member.name || 'Unknown';
-                                                const memberEmail = member.email || '';
-                                                const memberAvatar = member.avatar || member.profilePicture || null;
-                                                const isOnline = onlineUsers.includes(memberId);
-                                                const isCurrentUser = memberId.toString() === authUser?._id?.toString();
-                                                const isAdmin = member.role === 'admin' || member.role === 'Admin';
-                                                
-                                                return (
-                                                    <tr key={memberId} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="flex items-center gap-3">
-                                                                {memberAvatar ? (
-                                                                    <img 
-                                                                        src={memberAvatar} 
-                                                                        alt={memberName}
-                                                                        className="w-8 h-8 rounded-full object-cover"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs">
-                                                                        {memberName.charAt(0).toUpperCase()}
-                                                                    </div>
-                                                                )}
-                                                                <span className="font-medium text-slate-800 dark:text-white">
-                                                                    {memberName}
-                                                                    {isCurrentUser && (
-                                                                        <span className="ml-1 text-xs text-indigo-500">(You)</span>
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        
-                                                        {isTeamAdmin() ? 
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-300">
-                                                            {memberEmail}
-                                                        </td> : ""
-                                                        }
-                                                        
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <span className={`px-2 py-1 text-xs rounded-full ${
-                                                                isAdmin 
-                                                                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
-                                                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                                                            }`}>
-                                                                {isAdmin ? 'Admin' : 'Member'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-2 h-2 rounded-full ${
-                                                                    isOnline ? 'bg-emerald-400' : 'bg-slate-400'
-                                                                }`}></div>
-                                                                <span className="text-sm capitalize text-slate-600 dark:text-slate-300">
-                                                                    {isOnline ? 'Online' : 'Offline'}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        {!viewOnlyMode && isTeamAdmin() && !isCurrentUser && (
-                                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                                                <button 
-                                                                    onClick={() => handleRemoveMember(memberId, memberName)}
-                                                                    className="text-red-500 hover:text-red-700"
-                                                                >
-                                                                    Remove
-                                                                </button>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
-
-                {/* // pages/Team.jsx - Add null checks around selectedTeam usage */}
-
-                {selectedTeam && ( <> 
-                {/* Team Tasks Section */}
-<div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
-    <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
-        <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-            <ListTodo className="w-5 h-5 text-indigo-500" /> Team Tasks ({teamTasks.length})
-        </h3>
-        {isTeamAdmin() && (
-            <button onClick={openCreateTaskModal} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center gap-1">
-                <Plus className="w-4 h-4" /> Add Task
-            </button>
-        )}
-    </div>
-    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-        {teamTasks.length > 0 ? (
-            teamTasks.map(task => (
-                // <div key={task._id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                //     <div className="flex items-center justify-between mb-2">
-                //         <div>
-                //             <p className="font-medium text-slate-800 dark:text-white">{task.title}</p>
-                //             <p className="text-xs text-slate-500 dark:text-slate-400">
-                //                 Assigned to: {task.assignedTo?.map(u => u.fullName).join(', ') || 'Unassigned'}
-                //             </p>
-                //         </div>
-                //         <div className="flex items-center gap-2">
-                //             <span className={`px-2 py-1 text-xs rounded-full ${
-                //                 task.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : 
-                //                 task.status === 'In Progress' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
-                //             }`}>{task.status}</span>
-                //             {isTeamAdmin() && (
-                //                 <>
-                //                     <button onClick={() => openEditTaskModal(task)} className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"><Pencil className="w-4 h-4" /></button>
-                //                     <button onClick={() => handleDeleteTask(task._id)} className="p-1 text-red-600 hover:bg-red-100 rounded"><Trash2 className="w-4 h-4" /></button>
-                //                 </>
-                //             )}
-                //         </div>
-                //     </div>
-                //     <div className="flex items-center gap-3 mt-3">
-                //         <span className="text-xs text-slate-500 min-w-[60px]">Progress:</span>
-                //         <input 
-                //             type="checkbox" value={task.progress || 0}
-                //             onChange={(e) => handleProgressChange(task._id, parseInt(e.target.value))}
-                //             className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                //         />
-                //         <span className="text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[40px] text-right">{task.progress || 0}%</span>
-                //     </div>
-                // </div>
-                <div onClick={() => handleClick(task._id)}>
-                    <TaskCard 
-                        key={task._id}
-                        task={task}
-                        isAdmin={!viewOnlyMode && isTeamAdmin()}
-                        onEdit={openEditTaskModal}
-                        onDelete={handleDeleteTask}
-                        onProgressChange={handleProgressChange}
-                        updateTodoChecklist={updateTodoChecklist}
-                        teamMembers={selectedTeam?.members || []}
-                        currentUser={authUser}
-                    />
-                </div>
-            ))
-        ) : (
-            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                <ListTodo className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <p>No tasks for this team yet.</p>
-            </div>
-        )}
-    </div>
-</div>
-                 </> )}
-
-{/* Team Files Section - Add this with proper null check */}
-{selectedTeam && selectedTeam._id && (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-                <File className="w-5 h-5" />
-                Team Files
-            </h3>
-            {!viewOnlyMode && isTeamAdmin() && selectedTeam && selectedTeam._id && (
-                <TeamFiles 
-                    teamId={selectedTeam._id} 
-                    onFileUploaded={handleFileUploaded}
-                />
-            )}
-        </div>
-        <div className="p-4">
-            {selectedTeam && selectedTeam._id && (
-                <TeamFileList
-                files={selectedTeam.files || []}
-                teamId={selectedTeam._id}
-                onFileDeleted={handleFileDeleted}
-                isAdmin={isTeamAdmin()}
-                />
-            )}
-        </div>
-    </div>
-)}
-
-                {/* Add Members Modal */}
-                {showAddMemberModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-200/50 dark:border-slate-700/50">
-                            <div className="border-b border-slate-200/80 dark:border-slate-700/80 px-6 py-4 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                        <UserPlus className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-                                            Add Team Members
-                                        </h2>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Select users to add to "{selectedTeam?.name}"
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setShowAddMemberModal(false);
-                                        setSelectedUsers([]);
-                                    }}
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                            </div>
-
-                            <div className="p-6 flex-1 overflow-y-auto">
-                                {/* Search */}
-                                <div className="relative mb-4">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        value={userSearchTerm}
-                                        onChange={(e) => setUserSearchTerm(e.target.value)}
-                                        placeholder="Search users by name or email..."
-                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                </div>
-
-                                {/* Bulk Actions */}
-                                {filteredUsers.length > 0 && (
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <button
-                                            onClick={selectAllUsers}
-                                            className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-                                        >
-                                            Select All
-                                        </button>
-                                        <span className="text-slate-300 dark:text-slate-600">|</span>
-                                        <button
-                                            onClick={deselectAllUsers}
-                                            className="text-sm text-slate-500 dark:text-slate-400 hover:underline"
-                                        >
-                                            Deselect All
-                                        </button>
-                                        <span className="text-xs text-slate-400 ml-auto">
-                                            {filteredUsers.length} users available
-                                        </span>
-                                    </div>
-                                )}
-
-                                {/* Selected count */}
-                                {selectedUsers.length > 0 && (
-                                    <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-xl flex items-center justify-between">
-                                        <span className="text-sm text-indigo-600 dark:text-indigo-400">
-                                            {selectedUsers.length} user{selectedUsers.length > 1 ? 's' : ''} selected
-                                        </span>
-                                        <button
-                                            onClick={() => setSelectedUsers([])}
-                                            className="text-sm text-red-500 hover:text-red-700"
-                                        >
-                                            Clear all
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Users list */}
-                                {loadingUsers ? (
-                                    <div className="flex items-center justify-center py-12">
-                                        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                                    </div>
-                                ) : filteredUsers.length === 0 ? (
-                                    <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                                        <Users className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                                        <p>No users available to add</p>
-                                        {userSearchTerm && (
-                                            <p className="text-sm mt-1">Try adjusting your search</p>
-                                        )}
-                                        <p className="text-xs mt-2">All users are either already in the team or you</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                                        {filteredUsers.map((user) => {
-                                            const isSelected = selectedUsers.includes(user._id);
-                                            const userInitials = user.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U';
-                                            
-                                            return (
-                                                <div
-                                                    key={user._id}
-                                                    onClick={() => toggleUserSelection(user._id)}
-                                                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                                                        isSelected
-                                                            ? 'bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-500'
-                                                            : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent'
-                                                    }`}
-                                                >
-                                                    <div className="relative flex-shrink-0">
-                                                        {user.profilePic ? (
-                                                            <img
-                                                                src={user.profilePic}
-                                                                alt={user.fullName}
-                                                                className="w-10 h-10 rounded-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
-                                                                {userInitials}
-                                                            </div>
-                                                        )}
-                                                        {isSelected && (
-                                                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center">
-                                                                <Check className="w-3 h-3 text-white" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-slate-800 dark:text-white text-sm truncate">
-                                                            {user.fullName}
-                                                        </p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                                            {user.email}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-xs text-slate-400">
-                                                        {user.role || 'Member'}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="border-t border-slate-200/80 dark:border-slate-700/80 px-6 py-4 flex items-center gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowAddMemberModal(false);
-                                        setSelectedUsers([]);
-                                    }}
-                                    className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddSelectedUsers}
-                                    disabled={selectedUsers.length === 0 || isLoading}
-                                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Adding...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <UserPlus className="w-4 h-4" />
-                                            Add {selectedUsers.length > 0 ? `(${selectedUsers.length})` : ''}
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Edit Team Modal */}
-                {showEditTeamModal && (
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200/50 dark:border-slate-700/50">
-                            {/* Header */}
-                            <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-700/80 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                        <Edit2 className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-                                            Edit Team
-                                        </h2>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Update team details and cover image
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowEditTeamModal(false)}
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleUpdateTeam} className="p-6 space-y-5">
-                                {/* Cover Image Upload */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Cover Image
-                                    </label>
-                                    <div className="relative">
-                                        {editTeamData.coverPreview ? (
-                                            <div className="relative w-full h-40 rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-700">
-                                                <img 
-                                                    src={editTeamData.coverPreview} 
-                                                    alt="Team cover" 
-                                                    className="w-full h-full object-cover"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={removeCoverImage}
-                                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                                <label
-                                                    htmlFor="cover-image-upload"
-                                                    className="absolute bottom-2 right-2 p-2 bg-black/50 text-white rounded-lg hover:bg-black/70 transition-colors cursor-pointer"
-                                                >
-                                                    <Camera className="w-4 h-4" />
-                                                    <input
-                                                        ref={coverInputRef}
-                                                        id="cover-image-upload"
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={handleCoverImageChange}
-                                                        className="hidden"
-                                                    />
-                                                </label>
-                                            </div>
-                                        ) : (
-                                            <label
-                                                htmlFor="cover-image-upload"
-                                                className="w-full h-40 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all"
-                                            >
-                                                <Camera className="w-8 h-8 text-slate-400" />
-                                                <span className="text-sm text-slate-500 dark:text-slate-400 mt-2">Upload Cover Image</span>
-                                                <span className="text-xs text-slate-400">JPEG, PNG, GIF or WebP (max 5MB)</span>
-                                                <input
-                                                    ref={coverInputRef}
-                                                    id="cover-image-upload"
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleCoverImageChange}
-                                                    className="hidden"
-                                                />
-                                            </label>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Team Name */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Team Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            value={editTeamData.name}
-                                            onChange={(e) => setEditTeamData(prev => ({ ...prev, name: e.target.value }))}
-                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-800 dark:text-white"
-                                            maxLength={50}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Description */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Description
-                                    </label>
-                                    <div className="relative">
-                                        <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                                        <textarea
-                                            value={editTeamData.description}
-                                            onChange={(e) => setEditTeamData(prev => ({ ...prev, description: e.target.value }))}
-                                            rows={3}
-                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-800 dark:text-white resize-none"
-                                            maxLength={500}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Privacy Setting */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                        Privacy
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditTeamData(prev => ({ ...prev, isPrivate: true }))}
-                                            className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                                                editTeamData.isPrivate
-                                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
-                                                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                        >
-                                            <Lock className={`w-5 h-5 ${editTeamData.isPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
-                                            <div className="text-left">
-                                                <p className="text-sm font-medium text-slate-800 dark:text-white">Private</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">Only invited members</p>
-                                            </div>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditTeamData(prev => ({ ...prev, isPrivate: false }))}
-                                            className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                                                !editTeamData.isPrivate
-                                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10'
-                                                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                                            }`}
-                                        >
-                                            <Globe className={`w-5 h-5 ${!editTeamData.isPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
-                                            <div className="text-left">
-                                                <p className="text-sm font-medium text-slate-800 dark:text-white">Public</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">Visible to everyone</p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Error Display */}
-                                {error && (
-                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-start gap-2">
-                                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                                        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-                                    </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowEditTeamModal(false)}
-                                        className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isUpdatingTeam || !editTeamData.name.trim()}
-                                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {isUpdatingTeam ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Updating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save className="w-4 h-4" />
-                                                Update Team
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Invite Modal - Keep for email invite */}
-                {showInviteModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 max-w-md w-full mx-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                                    Invite Team Member
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        setShowInviteModal(false);
-                                        setInviteEmail('');
-                                        setError(null);
-                                    }}
-                                    className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
-                                >
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                            </div>
-                            <form onSubmit={handleInviteMember}>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Email Address
-                                    </label>
-                                    <input
-                                        type="email"
-                                        value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)}
-                                        placeholder="Enter email address"
-                                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        required
-                                    />
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                        The user will receive an invitation to join the team.
-                                    </p>
-                                </div>
-                                {error && (
-                                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm">
-                                        {error}
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowInviteModal(false);
-                                            setInviteEmail('');
-                                            setError(null);
-                                        }}
-                                        className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading || !inviteEmail.trim()}
-                                        className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {isLoading ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Sending...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <UserPlus className="w-4 h-4" />
-                                                Send Invite
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Join Team Modal */}
-                <JoinTeamModal 
-                    isOpen={showJoinModal}
-                    onClose={() => {
-                        setShowJoinModal(false);
-                        setJoinError(null);
-                        setJoinCode('');
-                    }}
-                    onSubmit={handleJoinTeam}
-                    joinCode={joinCode}
-                    setJoinCode={setJoinCode}
-                    isJoining={isJoining}
-                    error={joinError}
-                    setError={setJoinError}
-                />
-
-                {/* Create Team Modal */}
-                <CreateTeamModal
-                    isOpen={showCreateTeamModal}
-                    onClose={() => setShowCreateTeamModal(false)}
-                    onCreateTeam={handleCreateTeam}
-                    isCreating={isCreating}
-                />
-
-                {/* Team Tasks Section */}
-{/* Create/Edit Task Modal */}
-{isTaskModalOpen && (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                    {editingTask ? 'Edit Task' : 'Create New Task'}
-                </h3>
-                <button onClick={() => setIsTaskModalOpen(false)} className="p-1 hover:bg-slate-100 rounded">
-                    <X className="w-5 h-5" />
-                </button>
-            </div>
-            <form onSubmit={handleTaskSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Title <span className="text-red-500">*</span></label>
-                    <input 
-                        type="text" required value={taskForm.title} 
-                        onChange={(e) => setTaskForm({...taskForm, title: e.target.value})} 
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                    <textarea 
-                        rows={3} value={taskForm.description} 
-                        onChange={(e) => setTaskForm({...taskForm, description: e.target.value})} 
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                    />
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
-                        <select 
-                            value={taskForm.priority} 
-                            onChange={(e) => setTaskForm({...taskForm, priority: e.target.value})} 
-                            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    <div className="shrink-0 flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => setView('grid')}
+                            aria-label="Grid view"
+                            className={`p-2.5 transition-colors ${view === 'grid' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <option>Low</option><option>Medium</option><option>High</option>
-                        </select>
-                    </div>
-                    <div className="mt-3">
-                        <label className='text-xs font-medium text-slate-600'>
-                            TODO Checklist
-                        </label>
-
-                        <TodoListInput
-                        todoList={taskForm.todoChecklist || []}
-                        setTodoList={(value) => handleValueChange("todoChecklist", value)} />
+                            <Grid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setView('list')}
+                            aria-label="List view"
+                            className={`p-2.5 transition-colors ${view === 'list' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
-                    <input 
-                        type="date" value={taskForm.dueDate} 
-                        onChange={(e) => setTaskForm({...taskForm, dueDate: e.target.value})} 
-                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-                    />
-                </div>
-                <AssignMembersField
-                    members={selectedTeam?.members || []}
-                    value={taskForm.assignedTo || []}
-                    onChange={(ids) => setTaskForm((prev) => ({ ...prev, assignedTo: ids }))}
-                />
-                <div className="mt-3">
-              <label className='text-xs font-medium text-slate-600'>
-                Add Attachments
-              </label>
 
-              <AddAttachmentsInput
-              attachments={taskForm?.attachments}
-              setAttachments={(value) => handleValueChange("attachments", value)} /> 
+                {/* Team list */}
+                {filteredTeams.length === 0 ? (
+                    <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                        <Search className="w-12 h-12 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            No teams match "{searchTerm}"
+                        </p>
+                    </div>
+                ) : view === 'grid' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredTeams.map((team) => (
+                            <TeamCard
+                                key={team._id}
+                                team={team}
+                                isMember={checkIfUserIsMember(team)}
+                                isAdmin={isTeamAdmin(team)}
+                                getTeamInitials={getTeamInitials}
+                                onClick={() => navigate(`/team/${team._id}`)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="space-y-2.5">
+                        {filteredTeams.map((team) => (
+                            <TeamRow
+                                key={team._id}
+                                team={team}
+                                isMember={checkIfUserIsMember(team)}
+                                isAdmin={isTeamAdmin(team)}
+                                getTeamInitials={getTeamInitials}
+                                onClick={() => navigate(`/team/${team._id}`)}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
-                <div className="flex items-center gap-3 pt-2">
-                    <button type="button" onClick={() => setIsTaskModalOpen(false)} className="flex-1 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">
-                        Cancel
-                    </button>
-                    <button type="submit" className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg">
-                        {editingTask ? 'Update Task' : 'Create Task'}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-)}
-            </div>
+
+            <CreateTeamModal
+                isOpen={showCreateTeamModal}
+                onClose={() => setShowCreateTeamModal(false)}
+                onCreateTeam={handleCreateTeam}
+                isCreating={isCreating}
+            />
+            <JoinTeamModal
+                isOpen={showJoinModal}
+                onClose={() => setShowJoinModal(false)}
+                onSubmit={handleJoinTeam}
+            />
         </>
     );
 };
 
-// Join Team Modal Component
-const JoinTeamModal = ({ 
-    isOpen, 
-    onClose, 
-    onSubmit, 
-    joinCode, 
-    setJoinCode, 
-    isJoining, 
-    error, 
-    setError 
-}) => {
+export default Team;
+
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+const TeamCard = ({ team, isMember, isAdmin, getTeamInitials, onClick }) => {
+    const cover = team.coverImg || team.image || null;
+
+    return (
+        <button
+            onClick={onClick}
+            className="group text-left bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-lg transition-all overflow-hidden"
+        >
+            {/* Cover strip */}
+            <div className="relative h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                {cover && (
+                    <img
+                        src={cover}
+                        alt={team.name}
+                        className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                    />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+
+                {/* Badges */}
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    {isAdmin && (
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold bg-white/90 dark:bg-slate-900/90 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            <Shield className="w-3 h-3" />
+                            Admin
+                        </span>
+                    )}
+                    {!isMember && (
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold bg-amber-100/95 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                            <Eye className="w-3 h-3" />
+                            View Only
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Avatar overlapping cover */}
+            <div className="px-4 -mt-8 relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl border-2 border-white dark:border-slate-900 shadow-md overflow-hidden">
+                    {cover ? (
+                        <img
+                            src={cover}
+                            alt={team.name}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        getTeamInitials(team.name)
+                    )}
+                </div>
+            </div>
+
+            <div className="p-4 pt-3">
+                <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800 dark:text-white truncate flex-1">
+                        {team.name}
+                    </h3>
+                    {team.isPrivate ? (
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    ) : (
+                        <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    )}
+                </div>
+                
+                {/* Stats row */}
+                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="inline-flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {team.members?.length || 0}
+                    </span>
+                    {/* <span className="inline-flex items-center gap-1">
+                        <ListTodo className="w-3.5 h-3.5" />
+                        {team.tasks?.length || 0}
+                        {console.log(team)
+                        }
+                    </span> */}
+                    <span className="ml-auto text-indigo-600 dark:text-indigo-400 font-medium inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                        Open
+                        <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
+                </div>
+            </div>
+        </button>
+    );
+};
+
+const TeamRow = ({ team, isMember, isAdmin, getTeamInitials, onClick }) => {
+    const cover = team.coverImg || team.image || null;
+
+    return (
+        <button
+            onClick={onClick}
+            className="w-full text-left flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-sm transition-all group"
+        >
+            <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold overflow-hidden shrink-0">
+                {cover ? (
+                    <img src={cover} alt={team.name} className="w-full h-full object-cover" />
+                ) : (
+                    getTeamInitials(team.name)
+                )}
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm text-slate-800 dark:text-white truncate">
+                        {team.name}
+                    </p>
+                    {isAdmin && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-full">
+                            <Shield className="w-2.5 h-2.5" />
+                            Admin
+                        </span>
+                    )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {team.description || 'No description'} · {team.members?.length || 0} members
+                </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </button>
+    );
+};
+
+// ============================================================
+// JOIN MODAL (simplified inline)
+// ============================================================
+const JoinTeamModal = ({ isOpen, onClose, onSubmit }) => {
+    const [code, setCode] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!code.trim()) return;
+        setLoading(true);
+        setError('');
+        try {
+            await onSubmit(code);
+            setCode('');
+            onClose();
+        } catch (err) {
+            setError(err.response?.data?.message || 'Invalid invite code');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div 
-                className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200/50 dark:border-slate-700/50"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200/50 dark:border-slate-700/50">
                 <div className="border-b border-slate-200/80 dark:border-slate-700/80 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                             <LogIn className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-                                Join Team
-                            </h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Enter the invite code to join
-                            </p>
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Join Team</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Enter the invite code</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                    >
-                        <X className="w-5 h-5 text-slate-500" />
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                        <svg className="w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </div>
-
-                {/* Content */}
-                <form onSubmit={onSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                            Invite Code
-                        </label>
-                        <div className="relative">
-                            <Link2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={joinCode}
-                                onChange={(e) => {
-                                    setJoinCode(e.target.value.toUpperCase());
-                                    setError(null);
-                                }}
-                                placeholder="Enter invite code (e.g., ABC123)"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-lg font-mono tracking-widest text-center uppercase"
-                                maxLength={20}
-                                required
-                            />
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                            Ask your team admin for the invite code
-                        </p>
-                    </div>
-
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <input
+                        type="text"
+                        value={code}
+                        onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(''); }}
+                        placeholder="ABC123"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-mono tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        maxLength={20}
+                        autoFocus
+                    />
                     {error && (
-                        <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                        <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400">
+                            {error}
                         </div>
                     )}
-
-                    <div className="flex items-center gap-3 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isJoining || !joinCode.trim()}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                            {isJoining ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Joining...
-                                </>
-                            ) : (
-                                <>
-                                    <LogIn className="w-4 h-4" />
-                                    Join Team
-                                </>
-                            )}
+                    <div className="flex items-center gap-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-medium">Cancel</button>
+                        <button type="submit" disabled={loading || !code.trim()} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Join'}
                         </button>
                     </div>
                 </form>
@@ -2394,211 +475,3 @@ const JoinTeamModal = ({
         </div>
     );
 };
-
-const AssignMembersField = ({ members = [], value = [], onChange }) => {
-    const [search, setSearch] = useState('');
-
-    const filtered = useMemo(() => {
-        if (!search) return members;
-        const s = search.toLowerCase();
-        return members.filter(
-            (m) =>
-                (m.fullName || m.name || '').toLowerCase().includes(s) ||
-                (m.email || '').toLowerCase().includes(s)
-        );
-    }, [members, search]);
-
-    const getId = (m) => (m._id || m).toString();
-
-    const isSelected = (m) => value.includes(getId(m));
-
-    const toggle = (m) => {
-        const id = getId(m);
-        onChange(
-            value.includes(id)
-                ? value.filter((v) => v !== id)
-                : [...value, id]
-        );
-    };
-
-    const selectAll = () => {
-        const ids = filtered.map(getId);
-        const merged = Array.from(new Set([...value, ...ids]));
-        onChange(merged);
-    };
-
-    const deselectAll = () => {
-        const ids = new Set(filtered.map(getId));
-        onChange(value.filter((v) => !ids.has(v)));
-    };
-
-    return (
-        <div className="space-y-3">
-            {/* Header row */}
-            <div className="flex items-center justify-between gap-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Assign Members
-                </label>
-                <span className="text-xs text-slate-400">
-                    {value.length} of {members.length} selected
-                </span>
-            </div>
-
-            {/* Selected chips preview */}
-            {value.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-                    {value.map((id) => {
-                        const member = members.find((m) => getId(m) === id);
-                        const name =
-                            member?.fullName || member?.name || 'Unknown';
-                        const avatar =
-                            member?.profilePic || member?.avatar || null;
-                        const initials = name.charAt(0).toUpperCase();
-
-                        return (
-                            <span
-                                key={id}
-                                className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-                            >
-                                {avatar ? (
-                                    <img
-                                        src={avatar}
-                                        alt={name}
-                                        className="w-5 h-5 rounded-full object-cover"
-                                    />
-                                ) : (
-                                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[9px] font-semibold text-white">
-                                        {initials}
-                                    </span>
-                                )}
-                                <span className="truncate max-w-[110px]">
-                                    {name}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        toggle(member || { _id: id });
-                                    }}
-                                    className="ml-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 p-0.5"
-                                    aria-label={`Remove ${name}`}
-                                >
-                                    <X className="w-3 h-3 text-slate-400" />
-                                </button>
-                            </span>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Search + bulk actions */}
-            {members.length > 5 && (
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search members..."
-                            className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                    </div>
-                </div>
-            )}
-
-            {filtered.length > 0 && (
-                <div className="flex items-center gap-2 text-xs">
-                    <button
-                        type="button"
-                        onClick={selectAll}
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-                    >
-                        Select all
-                    </button>
-                    <span className="text-slate-300 dark:text-slate-600">·</span>
-                    <button
-                        type="button"
-                        onClick={deselectAll}
-                        className="text-slate-500 dark:text-slate-400 hover:underline"
-                    >
-                        Clear
-                    </button>
-                </div>
-            )}
-
-            {/* Members list */}
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1 -mr-1">
-                {filtered.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                        <Users className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-                        <p className="text-sm">
-                            {search
-                                ? 'No members match your search'
-                                : 'No team members yet'}
-                        </p>
-                    </div>
-                ) : (
-                    filtered.map((member) => {
-                        const id = getId(member);
-                        const selected = isSelected(member);
-                        const name = member.fullName || member.name || 'Unknown';
-                        const email = member.email || '';
-                        const avatar =
-                            member.profilePic || member.avatar || null;
-                        const initials = name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')
-                            .slice(0, 2)
-                            .toUpperCase();
-
-                        return (
-                            <div
-                                key={id}
-                                onClick={() => toggle(member)}
-                                className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border-2 ${
-                                    selected
-                                        ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500'
-                                        : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-transparent'
-                                }`}
-                            >
-                                <div className="relative shrink-0">
-                                    {avatar ? (
-                                        <img
-                                            src={avatar}
-                                            alt={name}
-                                            className="w-9 h-9 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs">
-                                            {initials}
-                                        </div>
-                                    )}
-                                    {selected && (
-                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
-                                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-800 dark:text-white truncate">
-                                        {name}
-                                    </p>
-                                    {email && (
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                            {email}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-        </div>
-    );
-};
-
-export default Team;

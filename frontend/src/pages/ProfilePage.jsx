@@ -145,12 +145,6 @@ const ProfilePage = () => {
                             Update your personal information and profile photo
                         </p>
                     </div>
-                    <button
-                        onClick={() => navigate('/dashboard')}
-                        className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        Back to Dashboard
-                    </button>
                 </div>
 
                 {/* Success Message */}
@@ -283,7 +277,7 @@ const ProfilePage = () => {
                                     className="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-not-allowed"
                                 />
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                    Email cannot be changed
+                                    Email can't be changed
                                 </p>
                             </div>
 
@@ -342,13 +336,6 @@ const ProfilePage = () => {
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3">
                         <button
-                            type="button"
-                            onClick={handleCancel}
-                            className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
                             type="submit"
                             disabled={isLoading}
                             className="flex-1 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -365,30 +352,15 @@ const ProfilePage = () => {
                                 </>
                             )}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleCancel}
+                            className="px-6 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        >
+                            Cancel
+                        </button>
                     </div>
                 </form>
-
-                {/* Account Statistics */}
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 text-center">
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                            {authUser?.teams?.length || 0}
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Teams</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 text-center">
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                            0
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Tasks</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 p-4 text-center">
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                            0
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Messages</p>
-                    </div>
-                </div>
             </div>
         </>
     );
